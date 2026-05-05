@@ -115,6 +115,45 @@ export function useStore() {
     }))
   }, [])
 
+  // Delete renewal - rollback if confirmed, just remove if pending
+  const deleteRenewal = useCallback((studentId: string, renewalId: string) => {
+    setStudents(prev => prev.map(s => {
+      if (s.id !== studentId) return s
+
+      const renewal = (s.renewalHistory || []).find(r => r.id === renewalId)
+      if (!renewal) return s
+
+      const updatedHistory = (s.renewalHistory || []).filter(r => r.id !== renewalId)
+
+      // If confirmed, rollback totalSessions and totalFee
+      if (renewal.confirmed) {
+        const newTotalSessions = s.totalSessions - renewal.addedSessions
+        const newTotalFee = s.totalFee - renewal.addedFee
+        const newSessionPrice = newTotalSessions > 0 ? newTotalFee / newTotalSessions : 0
+
+        // Recalculate sessionIncome from remaining confirmed data
+        // Use the latest venue fee from the most recent confirmed renewal, or original
+        const lastConfirmedRenewal = [...updatedHistory].reverse().find(r => r.confirmed)
+        const currentVenueFee = lastConfirmedRenewal ? (lastConfirmedRenewal.addedVenueFee || s.venueFee) : s.venueFee
+        
+        return {
+          ...s,
+          totalSessions: Math.max(0, newTotalSessions),
+          totalFee: Math.max(0, newTotalFee),
+          sessionPrice: newSessionPrice,
+          sessionIncome: newSessionPrice - currentVenueFee,
+          renewalHistory: updatedHistory,
+        }
+      }
+
+      // If pending, just remove from history (no impact on totals)
+      return {
+        ...s,
+        renewalHistory: updatedHistory,
+      }
+    }))
+  }, [])
+
   // Session operations
   const addSession = useCallback((session: Omit<Session, 'id' | 'createdAt'>) => {
     const newSession: Session = {
@@ -219,6 +258,7 @@ export function useStore() {
     deleteStudent,
     renewStudent,
     confirmRenewal,
+    deleteRenewal,
     addSession,
     updateSession,
     deleteSession,

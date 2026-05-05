@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, Fragment } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -20,6 +20,7 @@ interface StudentsViewProps {
   onDeleteStudent: (id: string) => void
   onRenewStudent: (id: string, addedSessions: number, addedFee: number, addedVenueFee: number) => void
   onConfirmRenewal: (studentId: string, renewalId: string) => void
+  onDeleteRenewal: (studentId: string, renewalId: string) => void
 }
 
 const courseTypeLabels: Record<string, string> = {
@@ -47,6 +48,7 @@ export function StudentsView({
   onDeleteStudent,
   onRenewStudent,
   onConfirmRenewal,
+  onDeleteRenewal,
 }: StudentsViewProps) {
   const [isFormOpen, setIsFormOpen] = useState(false)
   const [isRenewalOpen, setIsRenewalOpen] = useState(false)
@@ -85,8 +87,10 @@ export function StudentsView({
     
     // Pending (unconfirmed) renewals
     const pendingRenewals = (student.renewalHistory || []).filter(r => !r.confirmed)
+    // Confirmed renewals
+    const confirmedRenewals = (student.renewalHistory || []).filter(r => r.confirmed)
     
-    return { completedSessions, remainingSessions, progress, profit, showRenewal, sessionProfit, pendingRenewals }
+    return { completedSessions, remainingSessions, progress, profit, showRenewal, sessionProfit, pendingRenewals, confirmedRenewals }
   }
 
   return (
@@ -151,8 +155,8 @@ export function StudentsView({
                     const stats = getStudentStats(student)
                     const courseType = student.courseType || 'offline'
                     return (
-                      <>
-                        <tr key={student.id} className={cn(
+                      <Fragment key={student.id}>
+                        <tr className={cn(
                           "border-b border-border last:border-b-0 hover:bg-muted/30",
                           stats.showRenewal && "bg-warning/5"
                         )}>
@@ -212,9 +216,37 @@ export function StudentsView({
                             </div>
                           </td>
                         </tr>
+                        {/* Confirmed renewal records */}
+                        {stats.confirmedRenewals.map(renewal => (
+                          <tr key={renewal.id} className="border-b border-border bg-success/5">
+                            <td colSpan={7} className="px-3 py-1.5">
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-2">
+                                  <CheckCircle className="w-3 h-3 text-success flex-shrink-0" />
+                                  <span className="text-xs text-success">
+                                    已确认续课：+{renewal.addedSessions}节 / ¥{renewal.addedFee.toLocaleString()}
+                                  </span>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  <span className="text-xs text-muted-foreground">
+                                    {new Date(renewal.date).toLocaleDateString('zh-CN')}
+                                  </span>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-5 w-5 text-muted-foreground hover:text-destructive"
+                                    onClick={() => onDeleteRenewal(student.id, renewal.id)}
+                                  >
+                                    <Trash2 className="w-2.5 h-2.5" />
+                                  </Button>
+                                </div>
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
                         {/* Pending renewal confirmations */}
                         {stats.pendingRenewals.map(renewal => (
-                          <tr key={renewal.id} className="border-b border-border bg-accent/50">
+                          <tr key={renewal.id} className="border-b border-border bg-warning/5">
                             <td colSpan={7} className="px-3 py-1.5">
                               <div className="flex items-center justify-between">
                                 <div className="flex items-center gap-2">
@@ -224,18 +256,28 @@ export function StudentsView({
                                     onCheckedChange={() => onConfirmRenewal(student.id, renewal.id)}
                                     className="h-3.5 w-3.5"
                                   />
-                                  <label htmlFor={`confirm-${renewal.id}`} className="text-xs text-muted-foreground cursor-pointer">
+                                  <label htmlFor={`confirm-${renewal.id}`} className="text-xs text-warning cursor-pointer">
                                     待确认续课：+{renewal.addedSessions}节 / ¥{renewal.addedFee.toLocaleString()}
                                   </label>
                                 </div>
-                                <span className="text-xs text-muted-foreground">
-                                  {new Date(renewal.date).toLocaleDateString('zh-CN')}
-                                </span>
+                                <div className="flex items-center gap-2">
+                                  <span className="text-xs text-muted-foreground">
+                                    {new Date(renewal.date).toLocaleDateString('zh-CN')}
+                                  </span>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-5 w-5 text-muted-foreground hover:text-destructive"
+                                    onClick={() => onDeleteRenewal(student.id, renewal.id)}
+                                  >
+                                    <Trash2 className="w-2.5 h-2.5" />
+                                  </Button>
+                                </div>
                               </div>
                             </td>
                           </tr>
                         ))}
-                      </>
+                      </Fragment>
                     )
                   })}
                 </tbody>
@@ -328,19 +370,43 @@ export function StudentsView({
                       </div>
                     )}
 
+                    {/* Confirmed renewals */}
+                    {stats.confirmedRenewals.map(renewal => (
+                      <div key={renewal.id} className="flex items-center gap-2 p-1.5 bg-success/10 rounded text-xs">
+                        <CheckCircle className="w-3 h-3 text-success flex-shrink-0" />
+                        <span className="text-success flex-1">
+                          已确认 +{renewal.addedSessions}节
+                        </span>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-4 w-4 text-muted-foreground hover:text-destructive"
+                          onClick={() => onDeleteRenewal(student.id, renewal.id)}
+                        >
+                          <Trash2 className="w-2.5 h-2.5" />
+                        </Button>
+                      </div>
+                    ))}
                     {/* Pending renewals */}
                     {stats.pendingRenewals.map(renewal => (
-                      <div key={renewal.id} className="flex items-center gap-2 p-1.5 bg-accent/50 rounded text-xs">
+                      <div key={renewal.id} className="flex items-center gap-2 p-1.5 bg-warning/10 rounded text-xs">
                         <Checkbox
                           id={`card-confirm-${renewal.id}`}
                           checked={false}
                           onCheckedChange={() => onConfirmRenewal(student.id, renewal.id)}
                           className="h-3 w-3"
                         />
-                        <label htmlFor={`card-confirm-${renewal.id}`} className="text-muted-foreground cursor-pointer flex-1">
-                          续课 +{renewal.addedSessions}节
+                        <label htmlFor={`card-confirm-${renewal.id}`} className="text-warning cursor-pointer flex-1">
+                          待确认 +{renewal.addedSessions}节
                         </label>
-                        <CheckCircle className="w-3 h-3 text-muted-foreground" />
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-4 w-4 text-muted-foreground hover:text-destructive"
+                          onClick={() => onDeleteRenewal(student.id, renewal.id)}
+                        >
+                          <Trash2 className="w-2.5 h-2.5" />
+                        </Button>
                       </div>
                     ))}
 

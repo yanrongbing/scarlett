@@ -68,6 +68,7 @@ export default function CoachManagerPage() {
               onDeleteStudent={store.deleteStudent}
               onRenewStudent={store.renewStudent}
               onConfirmRenewal={store.confirmRenewal}
+              onDeleteRenewal={store.deleteRenewal}
             />
           )}
           

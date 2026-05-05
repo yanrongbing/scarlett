@@ -82,7 +82,7 @@ export function RenewalForm({ open, onOpenChange, student, sessions, onRenew }: 
         <DialogHeader>
           <DialogTitle className="text-foreground">续课 - {student.name}</DialogTitle>
           <DialogDescription>
-            添加续课课时，不会创建新合同。此阶段数据不计入当前收入，确认后才纳入统计。
+            保存为续课计划（待确认状态），不会立即计入正式课时和收入。需在学员列表中确认后才纳入统计。
           </DialogDescription>
         </DialogHeader>
         
@@ -187,7 +187,7 @@ export function RenewalForm({ open, onOpenChange, student, sessions, onRenew }: 
                 取消
               </Button>
               <Button type="submit" size="sm">
-                确认续课
+                保存续课计划
               </Button>
             </div>
           </form>
