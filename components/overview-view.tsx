@@ -4,13 +4,7 @@ import { useMemo } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Progress } from '@/components/ui/progress'
 import { Users, Calendar, TrendingUp, Target, Clock } from 'lucide-react'
-import { 
-  PieChart,
-  Pie,
-  Cell,
-  Tooltip,
-  ResponsiveContainer,
-} from 'recharts'
+
 import type { Student, Session } from '@/lib/types'
 
 interface OverviewViewProps {
@@ -25,8 +19,6 @@ const sourceLabels: Record<string, string> = {
   friend: '朋友',
   other: '其他',
 }
-
-const SOURCE_COLORS = ['#10b981', '#34d399', '#6ee7b7', '#a7f3d0']
 
 function getWeekRange(date: Date) {
   const day = date.getDay()
@@ -153,29 +145,6 @@ export function OverviewView({ students, sessions, getStudent }: OverviewViewPro
     }
   }, [sessions, students, getStudent])
 
-  // Student source distribution
-  const sourceData = useMemo(() => {
-    const sourceCounts: Record<string, number> = {
-      social_media: 0,
-      referral: 0,
-      friend: 0,
-      other: 0,
-    }
-    
-    students.forEach(student => {
-      const source = student.source || 'other'
-      sourceCounts[source] = (sourceCounts[source] || 0) + 1
-    })
-    
-    return Object.entries(sourceCounts)
-      .filter(([, count]) => count > 0)
-      .map(([source, count]) => ({
-        name: sourceLabels[source] || source,
-        value: count,
-        source,
-      }))
-  }, [students])
-
   // Student progress data
   const studentProgressData = useMemo(() => {
     return students.map(student => {
@@ -297,54 +266,8 @@ export function OverviewView({ students, sessions, getStudent }: OverviewViewPro
         </CardContent>
       </Card>
 
-      {/* Charts row */}
-      <div className="grid gap-3 md:gap-4 lg:grid-cols-2">
-        <Card className="bg-card border-border">
-          <CardHeader className="px-3 pt-2 pb-1 md:px-4 md:pt-3">
-            <CardTitle className="text-sm text-foreground">学员来源分布</CardTitle>
-          </CardHeader>
-          <CardContent className="px-3 pb-3 md:px-4 md:pb-4">
-            {sourceData.length > 0 ? (
-              <div className="flex items-center justify-center">
-                <ResponsiveContainer width="100%" height={160}>
-                  <PieChart>
-                    <Pie
-                      data={sourceData}
-                      cx="50%"
-                      cy="50%"
-                      innerRadius={40}
-                      outerRadius={60}
-                      paddingAngle={2}
-                      dataKey="value"
-                      label={({ name, value }) => `${name}: ${value}`}
-                      labelLine={{ stroke: 'hsl(var(--muted-foreground))', strokeWidth: 1 }}
-                    >
-                      {sourceData.map((_, index) => (
-                        <Cell key={`cell-${index}`} fill={SOURCE_COLORS[index % SOURCE_COLORS.length]} />
-                      ))}
-                    </Pie>
-                    <Tooltip 
-                      contentStyle={{ 
-                        backgroundColor: 'hsl(var(--card))', 
-                        border: '1px solid hsl(var(--border))',
-                        borderRadius: '8px',
-                        fontSize: '12px',
-                      }}
-                      formatter={(value: number) => [`${value} 人`, '学员数']}
-                    />
-                  </PieChart>
-                </ResponsiveContainer>
-              </div>
-            ) : (
-              <div className="h-[160px] flex items-center justify-center text-muted-foreground text-sm">
-                暂无学员
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Student Source Table */}
-        <Card className="bg-card border-border">
+      {/* Student Source Table */}
+      <Card className="bg-card border-border">
           <CardHeader className="px-3 pt-2 pb-1 md:px-4 md:pt-3">
             <CardTitle className="text-sm text-foreground">学员来源统计</CardTitle>
           </CardHeader>
@@ -380,7 +303,6 @@ export function OverviewView({ students, sessions, getStudent }: OverviewViewPro
             </div>
           </CardContent>
         </Card>
-      </div>
 
       {/* Student Progress */}
       <Card className="bg-card border-border">
