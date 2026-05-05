@@ -1,0 +1,405 @@
+'use client'
+
+import { useMemo } from 'react'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Badge } from '@/components/ui/badge'
+import { Progress } from '@/components/ui/progress'
+import { Bell, AlertCircle, CheckCircle, Wallet, User, RefreshCw, Star, Clock, FileText, VolumeX } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { cn } from '@/lib/utils'
+import type { Student, Session } from '@/lib/types'
+
+interface RiskViewProps {
+  students: Student[]
+  sessions: Session[]
+  getStudent: (id: string) => Student | undefined
+  onRenewStudent?: (student: Student) => void
+}
+
+interface RiskStudent {
+  student: Student
+  completed: number
+  remaining: number
+  remainingPercent: number
+  refundReserve: number
+  riskLevel: 'high' | 'medium' | 'low'
+  isNew: boolean
+}
+
+function getWeekRange(date: Date, weeksAgo: number = 0) {
+  const d = new Date(date)
+  d.setDate(d.getDate() - weeksAgo * 7)
+  const day = d.getDay()
+  const diff = d.getDate() - day + (day === 0 ? -6 : 1)
+  const monday = new Date(d)
+  monday.setDate(diff)
+  monday.setHours(0, 0, 0, 0)
+  
+  const sunday = new Date(monday)
+  sunday.setDate(monday.getDate() + 6)
+  sunday.setHours(23, 59, 59, 999)
+  
+  return { start: monday, end: sunday }
+}
+
+export function RiskView({ students, sessions, getStudent, onRenewStudent }: RiskViewProps) {
+  // 近1周新增学员
+  const newStudentsThisWeek = useMemo(() => {
+    const now = new Date()
+    const oneWeekAgo = new Date(now)
+    oneWeekAgo.setDate(oneWeekAgo.getDate() - 7)
+    const oneWeekAgoStr = oneWeekAgo.toISOString().split('T')[0]
+    
+    return students.filter(s => {
+      if (!s.createdAt) return false
+      const createdDate = new Date(s.createdAt).toISOString().split('T')[0]
+      return createdDate >= oneWeekAgoStr
+    })
+  }, [students])
+
+  // 续课提醒（剩余课时 <= 4）
+  const renewalReminders = useMemo(() => {
+    return students.map(student => {
+      const completed = sessions.filter(
+        s => s.studentId === student.id && s.status === 'completed'
+      ).length
+      const remaining = student.totalSessions - completed
+      return { student, completed, remaining }
+    }).filter(item => item.remaining <= 4 && item.remaining >= 0)
+      .sort((a, b) => a.remaining - b.remaining)
+  }, [students, sessions])
+
+  // 近两周重点学员（按上课次数排序）
+  const topStudents = useMemo(() => {
+    const now = new Date()
+    const thisWeek = getWeekRange(now, 0)
+    const lastWeek = getWeekRange(now, 1)
+    
+    const startStr = lastWeek.start.toISOString().split('T')[0]
+    const endStr = thisWeek.end.toISOString().split('T')[0]
+    
+    const twoWeekSessions = sessions.filter(s => s.date >= startStr && s.date <= endStr)
+    
+    const studentSessionCounts: Record<string, number> = {}
+    twoWeekSessions.forEach(s => {
+      studentSessionCounts[s.studentId] = (studentSessionCounts[s.studentId] || 0) + 1
+    })
+    
+    return Object.entries(studentSessionCounts)
+      .map(([studentId, count]) => {
+        const student = getStudent(studentId)
+        return { student, count }
+      })
+      .filter(item => item.student)
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 8)
+  }, [sessions, getStudent])
+
+  // 近期静默学员（近2周未排课）
+  const silentStudents = useMemo(() => {
+    const now = new Date()
+    const twoWeeksAgo = getWeekRange(now, 1)
+    const startStr = twoWeeksAgo.start.toISOString().split('T')[0]
+    const endStr = now.toISOString().split('T')[0]
+    
+    const activeStudentIds = new Set(
+      sessions
+        .filter(s => s.date >= startStr && s.date <= endStr)
+        .map(s => s.studentId)
+    )
+    
+    return students.filter(s => !activeStudentIds.has(s.id))
+  }, [students, sessions])
+
+  // 课时分析
+  const riskAnalysis = useMemo(() => {
+    const newStudentIds = new Set(newStudentsThisWeek.map(s => s.id))
+    
+    const analysis: RiskStudent[] = students.map(student => {
+      const completed = sessions.filter(
+        s => s.studentId === student.id && s.status === 'completed'
+      ).length
+      const remaining = student.totalSessions - completed
+      const remainingPercent = student.totalSessions > 0 
+        ? (remaining / student.totalSessions) * 100 
+        : 0
+      
+      const refundReserve = remaining * student.sessionPrice * 0.3
+      
+      let riskLevel: 'high' | 'medium' | 'low' = 'low'
+      if (remainingPercent > 60) {
+        riskLevel = 'high'
+      } else if (remainingPercent > 40) {
+        riskLevel = 'medium'
+      }
+      
+      return {
+        student,
+        completed,
+        remaining,
+        remainingPercent,
+        refundReserve,
+        riskLevel,
+        isNew: newStudentIds.has(student.id),
+      }
+    })
+    
+    return analysis.sort((a, b) => b.remainingPercent - a.remainingPercent)
+  }, [students, sessions, newStudentsThisWeek])
+
+  const totalRefundReserve = useMemo(() => {
+    return riskAnalysis.reduce((sum, r) => sum + r.refundReserve, 0)
+  }, [riskAnalysis])
+
+  const highRiskCount = riskAnalysis.filter(r => r.riskLevel === 'high').length
+
+  const getRiskIcon = (level: string) => {
+    switch (level) {
+      case 'high':
+        return <Bell className="w-3 h-3 text-destructive" />
+      case 'medium':
+        return <AlertCircle className="w-3 h-3 text-warning" />
+      default:
+        return <CheckCircle className="w-3 h-3 text-success" />
+    }
+  }
+
+  const getRiskBadge = (level: string) => {
+    switch (level) {
+      case 'high':
+        return <Badge variant="destructive" className="text-sm font-semibold px-2 py-0.5">需关注</Badge>
+      case 'medium':
+        return <Badge className="bg-warning text-warning-foreground text-sm font-semibold px-2 py-0.5">注意</Badge>
+      default:
+        return <Badge className="bg-success text-success-foreground text-xs px-1.5 py-0">正常</Badge>
+    }
+  }
+
+  return (
+    <div className="space-y-3 md:space-y-4">
+      <div>
+        <h2 className="text-xl md:text-2xl font-semibold text-foreground">重要提醒</h2>
+        <p className="text-sm text-muted-foreground">监控学员课时消耗与续课提醒</p>
+      </div>
+
+      {/* Summary Cards - compact 3 columns */}
+      <div className="grid grid-cols-3 gap-2">
+        <Card className="bg-card border-border">
+          <CardContent className="p-2 md:p-3">
+            <div className="flex items-center justify-between mb-0.5">
+              <span className="text-xs text-muted-foreground">需关注</span>
+              <Bell className="w-3 h-3 text-destructive" />
+            </div>
+            <div className="text-base md:text-xl font-bold text-destructive">{highRiskCount}</div>
+          </CardContent>
+        </Card>
+        
+        <Card className="bg-card border-border">
+          <CardContent className="p-2 md:p-3">
+            <div className="flex items-center justify-between mb-0.5">
+              <span className="text-xs text-muted-foreground">建议续课</span>
+              <RefreshCw className="w-3 h-3 text-warning" />
+            </div>
+            <div className="text-base md:text-xl font-bold text-warning">{renewalReminders.length}</div>
+          </CardContent>
+        </Card>
+        
+        <Card className="bg-card border-border">
+          <CardContent className="p-2 md:p-3">
+            <div className="flex items-center justify-between mb-0.5">
+              <span className="text-xs text-muted-foreground">预留退费</span>
+              <Wallet className="w-3 h-3 text-muted-foreground" />
+            </div>
+            <div className="text-base md:text-xl font-bold text-foreground">¥{Math.round(totalRefundReserve).toLocaleString()}</div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* 续课提醒 - moved before 近两周重点学员 */}
+      {renewalReminders.length > 0 && (
+        <Card className="bg-card border-border border-warning/50">
+          <CardHeader className="px-3 py-2 md:px-4 md:py-3">
+            <CardTitle className="text-sm flex items-center gap-2 text-foreground">
+              <RefreshCw className="w-4 h-4 text-warning" />
+              续课提醒
+              <Badge className="bg-warning/20 text-warning border-warning/30 text-sm font-semibold">{renewalReminders.length}</Badge>
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="px-3 pb-3 md:px-4 md:pb-4 pt-0">
+            <div className="space-y-1.5">
+              {renewalReminders.map(({ student, completed, remaining }) => (
+                <div 
+                  key={student.id} 
+                  className="flex items-center justify-between p-2 rounded-lg bg-warning/5 border border-warning/20"
+                >
+                  <div className="flex items-center gap-2 min-w-0 flex-1">
+                    <div className="w-5 h-5 rounded-full bg-warning/20 flex items-center justify-center flex-shrink-0">
+                      <User className="w-2.5 h-2.5 text-warning" />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-xs font-medium text-foreground truncate">{student.name}</p>
+                      <p className="text-xs text-muted-foreground">剩{remaining}节/已完成{completed}节</p>
+                    </div>
+                  </div>
+                  {onRenewStudent && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="h-6 text-xs gap-1 px-2 flex-shrink-0 border-warning/50 text-warning hover:bg-warning/10"
+                      onClick={() => onRenewStudent(student)}
+                    >
+                      <RefreshCw className="w-3 h-3" />
+                      续课
+                    </Button>
+                  )}
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* 近两周重点学员 */}
+      <Card className="bg-card border-border">
+        <CardHeader className="px-3 py-2 md:px-4 md:py-3">
+          <CardTitle className="text-sm flex items-center gap-2 text-foreground">
+            <Star className="w-4 h-4 text-primary" />
+            近两周重点学员
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="px-3 pb-3 md:px-4 md:pb-4 pt-0">
+          {topStudents.length > 0 ? (
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-1.5">
+              {topStudents.map(({ student, count }) => (
+                <div 
+                  key={student!.id}
+                  className="flex items-center gap-1.5 p-1.5 rounded bg-muted/50 border border-border"
+                >
+                  <div className="w-5 h-5 rounded-full bg-primary/20 flex items-center justify-center flex-shrink-0">
+                    <User className="w-2.5 h-2.5 text-primary" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-xs font-medium text-foreground truncate">{student!.name}</p>
+                    <p className="text-xs text-muted-foreground">{count}次</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-xs text-muted-foreground text-center py-3">近两周暂无上课记录</p>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* 近期静默学员 */}
+      {silentStudents.length > 0 && (
+        <Card className="bg-card border-border border-destructive/50">
+          <CardHeader className="px-3 py-2 md:px-4 md:py-3">
+            <CardTitle className="text-sm flex items-center gap-2 text-foreground">
+              <VolumeX className="w-4 h-4 text-destructive" />
+              近期静默学员
+              <Badge variant="destructive" className="text-sm font-semibold px-2">重点关注</Badge>
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="px-3 pb-3 md:px-4 md:pb-4 pt-0">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-1.5">
+              {silentStudents.map(student => (
+                <div 
+                  key={student.id}
+                  className="flex items-center gap-1.5 p-1.5 rounded bg-destructive/5 border border-destructive/20"
+                >
+                  <div className="w-5 h-5 rounded-full bg-destructive/20 flex items-center justify-center flex-shrink-0">
+                    <User className="w-2.5 h-2.5 text-destructive" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-xs font-medium text-foreground truncate">{student.name}</p>
+                    <p className="text-xs text-destructive">2周未排课</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* 学员课时详情 */}
+      <Card className="bg-card border-border">
+        <CardHeader className="px-3 py-2 md:px-4 md:py-3">
+          <CardTitle className="text-sm text-foreground">学员课时详情</CardTitle>
+        </CardHeader>
+        <CardContent className="px-3 pb-3 md:px-4 md:pb-4 pt-0">
+          {riskAnalysis.length === 0 ? (
+            <div className="text-center py-4 text-muted-foreground">
+              <User className="w-6 h-6 mx-auto mb-1 opacity-50" />
+              <p className="text-xs">暂无学员数据</p>
+            </div>
+          ) : (
+            <div className="space-y-1.5">
+              {riskAnalysis.map(({ student, completed, remaining, remainingPercent, refundReserve, riskLevel, isNew }) => (
+                <div 
+                  key={student.id} 
+                  className={cn(
+                    "p-2 rounded border",
+                    isNew && "border-chart-2/30 bg-chart-2/5",
+                    !isNew && riskLevel === 'high' && "border-destructive/30 bg-destructive/5",
+                    !isNew && riskLevel === 'medium' && "border-warning/30 bg-warning/5",
+                    !isNew && riskLevel === 'low' && "border-border bg-muted/30"
+                  )}
+                >
+                  <div className="flex items-center justify-between mb-1.5">
+                    <div className="flex items-center gap-1.5">
+                      {isNew ? (
+                        <FileText className="w-3 h-3 text-chart-2" />
+                      ) : (
+                        getRiskIcon(riskLevel)
+                      )}
+                      <span className="text-xs font-medium text-foreground">{student.name}</span>
+                      <span className="text-xs text-muted-foreground">¥{student.sessionPrice.toFixed(0)}/节</span>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      {isNew ? (
+                        <Badge className="bg-chart-2/20 text-chart-2 border-chart-2/30 text-xs px-1.5 py-0">
+                          新学员
+                        </Badge>
+                      ) : (
+                        getRiskBadge(riskLevel)
+                      )}
+                    </div>
+                  </div>
+                  
+                  {isNew && !student.trainingBackground && (
+                    <div className="flex items-center gap-1 text-xs text-chart-2 mb-1.5">
+                      <FileText className="w-3 h-3" />
+                      <span>建议添加训练计划</span>
+                    </div>
+                  )}
+                  
+                  <div className="space-y-0.5">
+                    <div className="flex justify-between text-xs">
+                      <span className="text-muted-foreground">课时</span>
+                      <span className="text-foreground">{completed}/{student.totalSessions} (剩{remaining})</span>
+                    </div>
+                    <Progress 
+                      value={100 - remainingPercent} 
+                      className={cn(
+                        "h-1",
+                        !isNew && riskLevel === 'high' && "[&>div]:bg-destructive",
+                        !isNew && riskLevel === 'medium' && "[&>div]:bg-warning",
+                        isNew && "[&>div]:bg-chart-2"
+                      )}
+                    />
+                  </div>
+                  
+                  <div className="flex justify-between text-xs mt-1">
+                    <span className="text-muted-foreground">剩余 {remainingPercent.toFixed(0)}%</span>
+                    <span className="text-muted-foreground">预留退费 ¥{Math.round(refundReserve).toLocaleString()}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  )
+}
