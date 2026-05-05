@@ -5,16 +5,11 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Progress } from '@/components/ui/progress'
 import { Users, Calendar, TrendingUp, Target, Clock } from 'lucide-react'
 import { 
-  LineChart, 
-  Line, 
-  XAxis, 
-  YAxis, 
-  CartesianGrid, 
-  Tooltip, 
-  ResponsiveContainer,
   PieChart,
   Pie,
   Cell,
+  Tooltip,
+  ResponsiveContainer,
 } from 'recharts'
 import type { Student, Session } from '@/lib/types'
 
@@ -63,17 +58,14 @@ export function OverviewView({ students, sessions, getStudent }: OverviewViewPro
     
     const weekSessions = sessions.filter(s => s.date >= startStr && s.date <= endStr)
     const completedSessions = weekSessions.filter(s => s.status === 'completed')
-    const plannedSessions = weekSessions.filter(s => s.status === 'planned')
     
-    // 本周上课人数（已完成的不重复学员）
     const uniqueStudentIds = new Set(completedSessions.map(s => s.studentId))
     const weekStudentCount = uniqueStudentIds.size
     
-    // 本周课时进度
     const completedCount = completedSessions.length
     const totalScheduled = weekSessions.length
     
-    // 本周利润（基于已完成课程的学员）
+    // 本周利润 = 每个已完成课程学员的 (单次课费 - 场地费)
     let weekProfit = 0
     completedSessions.forEach(session => {
       const student = getStudent(session.studentId)
@@ -100,14 +92,11 @@ export function OverviewView({ students, sessions, getStudent }: OverviewViewPro
     const monthSessions = sessions.filter(s => s.date >= startStr && s.date <= endStr)
     const completedSessions = monthSessions.filter(s => s.status === 'completed')
     
-    // 本月上课人数（已完成的不重复学员）
     const uniqueStudentIds = new Set(completedSessions.map(s => s.studentId))
     const monthStudentCount = uniqueStudentIds.size
     
-    // 本月已完成课时
     const completedCount = completedSessions.length
     
-    // 本月利润
     let monthProfit = 0
     completedSessions.forEach(session => {
       const student = getStudent(session.studentId)
@@ -123,36 +112,46 @@ export function OverviewView({ students, sessions, getStudent }: OverviewViewPro
     }
   }, [sessions, getStudent])
 
-  // Generate weekly revenue data
-  const weeklyData = useMemo(() => {
-    const weeks: Record<string, { week: string; revenue: number; profit: number; sessions: number }> = {}
-    const completedSessions = sessions.filter(s => s.status === 'completed')
+  // 未来30天收入预期
+  const futureIncome = useMemo(() => {
+    const now = new Date()
+    const futureEnd = new Date(now)
+    futureEnd.setDate(futureEnd.getDate() + 30)
+    const nowStr = now.toISOString().split('T')[0]
+    const endStr = futureEnd.toISOString().split('T')[0]
+
+    // 已排课的未来课程（已确认收入）
+    const futurePlannedSessions = sessions.filter(
+      s => s.date >= nowStr && s.date <= endStr && s.status === 'planned'
+    )
     
-    completedSessions.forEach(session => {
-      const date = new Date(session.date)
-      const weekStart = new Date(date)
-      weekStart.setDate(date.getDate() - date.getDay() + 1)
-      const weekKey = weekStart.toISOString().split('T')[0]
-      
+    let confirmedIncome = 0
+    futurePlannedSessions.forEach(session => {
       const student = getStudent(session.studentId)
-      if (!student) return
-      
-      if (!weeks[weekKey]) {
-        weeks[weekKey] = {
-          week: `${weekStart.getMonth() + 1}/${weekStart.getDate()}`,
-          revenue: 0,
-          profit: 0,
-          sessions: 0,
-        }
+      if (student) {
+        confirmedIncome += student.sessionIncome || (student.sessionPrice - student.venueFee)
       }
-      
-      weeks[weekKey].revenue += student.sessionPrice
-      weeks[weekKey].profit += student.sessionIncome || (student.sessionPrice - student.venueFee)
-      weeks[weekKey].sessions += 1
     })
     
-    return Object.values(weeks).slice(-8)
-  }, [sessions, getStudent])
+    // 未确认的续课收入（预期收入）
+    let pendingIncome = 0
+    students.forEach(student => {
+      const pendingRenewals = (student.renewalHistory || []).filter(r => !r.confirmed)
+      pendingRenewals.forEach(renewal => {
+        const perSession = renewal.addedSessions > 0 
+          ? (renewal.addedFee / renewal.addedSessions) - (renewal.addedVenueFee || 0)
+          : 0
+        pendingIncome += perSession * renewal.addedSessions
+      })
+    })
+    
+    return {
+      confirmed: confirmedIncome,
+      pending: pendingIncome,
+      total: confirmedIncome + pendingIncome,
+      plannedSessionCount: futurePlannedSessions.length,
+    }
+  }, [sessions, students, getStudent])
 
   // Student source distribution
   const sourceData = useMemo(() => {
@@ -195,138 +194,126 @@ export function OverviewView({ students, sessions, getStudent }: OverviewViewPro
   }, [students, sessions])
 
   return (
-    <div className="space-y-4 md:space-y-6">
+    <div className="space-y-3 md:space-y-4">
       <div>
         <h2 className="text-xl md:text-2xl font-semibold text-foreground">情况总览</h2>
         <p className="text-sm text-muted-foreground">姜贝果教练私教课情况</p>
       </div>
 
-      {/* 本周数据 */}
+      {/* 本周数据 - compact */}
       <Card className="bg-card border-border">
-        <CardHeader className="pb-2 px-3 md:px-6 pt-3 md:pt-6">
-          <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-            <Calendar className="w-4 h-4" />
+        <CardHeader className="pb-1 px-3 pt-2 md:px-4 md:pt-3">
+          <CardTitle className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
+            <Calendar className="w-3.5 h-3.5" />
             本周数据
           </CardTitle>
         </CardHeader>
-        <CardContent className="px-3 md:px-6 pb-3 md:pb-6">
-          <div className="grid grid-cols-3 gap-2 md:gap-4">
-            <div className="text-center p-2 md:p-3 rounded-lg bg-muted/50">
-              <div className="text-xs text-muted-foreground mb-1">上课人数</div>
-              <div className="text-lg md:text-xl font-bold text-foreground">{weekStats.studentCount}</div>
+        <CardContent className="px-3 pb-2 md:px-4 md:pb-3">
+          <div className="grid grid-cols-3 gap-2">
+            <div className="text-center p-1.5 md:p-2 rounded bg-muted/50">
+              <div className="text-xs text-muted-foreground">上课人数</div>
+              <div className="text-base md:text-lg font-bold text-foreground">{weekStats.studentCount}</div>
             </div>
-            <div className="text-center p-2 md:p-3 rounded-lg bg-muted/50">
-              <div className="text-xs text-muted-foreground mb-1">课时进度</div>
-              <div className="text-lg md:text-xl font-bold text-foreground">
+            <div className="text-center p-1.5 md:p-2 rounded bg-muted/50">
+              <div className="text-xs text-muted-foreground">课时进度</div>
+              <div className="text-base md:text-lg font-bold text-foreground">
                 {weekStats.completedCount}/{weekStats.totalScheduled}
               </div>
             </div>
-            <div className="text-center p-2 md:p-3 rounded-lg bg-muted/50">
-              <div className="text-xs text-muted-foreground mb-1">本周利润</div>
-              <div className="text-lg md:text-xl font-bold text-success">¥{weekStats.profit.toLocaleString()}</div>
+            <div className="text-center p-1.5 md:p-2 rounded bg-muted/50">
+              <div className="text-xs text-muted-foreground">本周利润</div>
+              <div className="text-base md:text-lg font-bold text-success">¥{weekStats.profit.toLocaleString()}</div>
             </div>
           </div>
         </CardContent>
       </Card>
 
-      {/* 本月数据 */}
+      {/* 本月数据 - compact */}
       <Card className="bg-card border-border">
-        <CardHeader className="pb-2 px-3 md:px-6 pt-3 md:pt-6">
-          <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-            <Clock className="w-4 h-4" />
+        <CardHeader className="pb-1 px-3 pt-2 md:px-4 md:pt-3">
+          <CardTitle className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
+            <Clock className="w-3.5 h-3.5" />
             本月数据
           </CardTitle>
         </CardHeader>
-        <CardContent className="px-3 md:px-6 pb-3 md:pb-6">
-          <div className="grid grid-cols-3 gap-2 md:gap-4">
-            <div className="text-center p-2 md:p-3 rounded-lg bg-muted/50">
-              <div className="text-xs text-muted-foreground mb-1">上课人数</div>
-              <div className="text-lg md:text-xl font-bold text-foreground">{monthStats.studentCount}</div>
+        <CardContent className="px-3 pb-2 md:px-4 md:pb-3">
+          <div className="grid grid-cols-3 gap-2">
+            <div className="text-center p-1.5 md:p-2 rounded bg-muted/50">
+              <div className="text-xs text-muted-foreground">上课人数</div>
+              <div className="text-base md:text-lg font-bold text-foreground">{monthStats.studentCount}</div>
             </div>
-            <div className="text-center p-2 md:p-3 rounded-lg bg-muted/50">
-              <div className="text-xs text-muted-foreground mb-1">已完成课时</div>
-              <div className="text-lg md:text-xl font-bold text-foreground">{monthStats.completedCount}</div>
+            <div className="text-center p-1.5 md:p-2 rounded bg-muted/50">
+              <div className="text-xs text-muted-foreground">已完成课时</div>
+              <div className="text-base md:text-lg font-bold text-foreground">{monthStats.completedCount}</div>
             </div>
-            <div className="text-center p-2 md:p-3 rounded-lg bg-muted/50">
-              <div className="text-xs text-muted-foreground mb-1">本月利润</div>
-              <div className="text-lg md:text-xl font-bold text-success">¥{monthStats.profit.toLocaleString()}</div>
+            <div className="text-center p-1.5 md:p-2 rounded bg-muted/50">
+              <div className="text-xs text-muted-foreground">本月利润</div>
+              <div className="text-base md:text-lg font-bold text-success">¥{monthStats.profit.toLocaleString()}</div>
             </div>
           </div>
         </CardContent>
       </Card>
 
-      {/* Charts */}
-      <div className="grid gap-4 md:gap-6 lg:grid-cols-2">
-        <Card className="bg-card border-border">
-          <CardHeader className="px-3 md:px-6 pt-3 md:pt-6 pb-2">
-            <CardTitle className="text-sm md:text-base text-foreground">收入趋势</CardTitle>
-          </CardHeader>
-          <CardContent className="px-3 md:px-6 pb-3 md:pb-6">
-            {weeklyData.length > 0 ? (
-              <ResponsiveContainer width="100%" height={200}>
-                <LineChart data={weeklyData}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                  <XAxis 
-                    dataKey="week" 
-                    stroke="hsl(var(--muted-foreground))"
-                    fontSize={10}
-                  />
-                  <YAxis 
-                    stroke="hsl(var(--muted-foreground))"
-                    fontSize={10}
-                    width={40}
-                  />
-                  <Tooltip 
-                    contentStyle={{ 
-                      backgroundColor: 'hsl(var(--card))', 
-                      border: '1px solid hsl(var(--border))',
-                      borderRadius: '8px',
-                      fontSize: '12px',
-                    }}
-                    labelStyle={{ color: 'hsl(var(--foreground))' }}
-                    formatter={(value: number) => [`¥${value.toLocaleString()}`, '']}
-                  />
-                  <Line 
-                    type="monotone" 
-                    dataKey="revenue" 
-                    name="收入"
-                    stroke="hsl(var(--primary))" 
-                    strokeWidth={2}
-                    dot={{ fill: 'hsl(var(--primary))', r: 3 }}
-                  />
-                  <Line 
-                    type="monotone" 
-                    dataKey="profit" 
-                    name="利润"
-                    stroke="hsl(var(--chart-2))" 
-                    strokeWidth={2}
-                    dot={{ fill: 'hsl(var(--chart-2))', r: 3 }}
-                  />
-                </LineChart>
-              </ResponsiveContainer>
-            ) : (
-              <div className="h-[200px] flex items-center justify-center text-muted-foreground text-sm">
-                暂无数据
+      {/* 未来30天收入预期 */}
+      <Card className="bg-card border-border">
+        <CardHeader className="pb-1 px-3 pt-2 md:px-4 md:pt-3">
+          <CardTitle className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
+            <TrendingUp className="w-3.5 h-3.5" />
+            未来30天收入预期
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="px-3 pb-3 md:px-4 md:pb-4">
+          <div className="grid grid-cols-3 gap-2 mb-3">
+            <div className="text-center p-1.5 md:p-2 rounded bg-primary/10 border border-primary/20">
+              <div className="text-xs text-muted-foreground">已确认收入</div>
+              <div className="text-base md:text-lg font-bold text-primary">¥{futureIncome.confirmed.toLocaleString()}</div>
+              <div className="text-xs text-muted-foreground">{futureIncome.plannedSessionCount}节已排</div>
+            </div>
+            <div className="text-center p-1.5 md:p-2 rounded bg-warning/10 border border-warning/20">
+              <div className="text-xs text-muted-foreground">预期收入</div>
+              <div className="text-base md:text-lg font-bold text-warning">¥{futureIncome.pending.toLocaleString()}</div>
+              <div className="text-xs text-muted-foreground">续课未确认</div>
+            </div>
+            <div className="text-center p-1.5 md:p-2 rounded bg-success/10 border border-success/20">
+              <div className="text-xs text-muted-foreground">合计预期</div>
+              <div className="text-base md:text-lg font-bold text-success">¥{futureIncome.total.toLocaleString()}</div>
+              <div className="text-xs text-muted-foreground">30天内</div>
+            </div>
+          </div>
+          {futureIncome.total > 0 && (
+            <div className="space-y-1">
+              <div className="flex justify-between text-xs">
+                <span className="text-muted-foreground">已确认占比</span>
+                <span className="text-foreground">
+                  {futureIncome.total > 0 ? ((futureIncome.confirmed / futureIncome.total) * 100).toFixed(0) : 0}%
+                </span>
               </div>
-            )}
-          </CardContent>
-        </Card>
+              <Progress 
+                value={futureIncome.total > 0 ? (futureIncome.confirmed / futureIncome.total) * 100 : 0} 
+                className="h-1.5"
+              />
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
+      {/* Charts row */}
+      <div className="grid gap-3 md:gap-4 lg:grid-cols-2">
         <Card className="bg-card border-border">
-          <CardHeader className="px-3 md:px-6 pt-3 md:pt-6 pb-2">
-            <CardTitle className="text-sm md:text-base text-foreground">学员来源分布</CardTitle>
+          <CardHeader className="px-3 pt-2 pb-1 md:px-4 md:pt-3">
+            <CardTitle className="text-sm text-foreground">学员来源分布</CardTitle>
           </CardHeader>
-          <CardContent className="px-3 md:px-6 pb-3 md:pb-6">
+          <CardContent className="px-3 pb-3 md:px-4 md:pb-4">
             {sourceData.length > 0 ? (
               <div className="flex items-center justify-center">
-                <ResponsiveContainer width="100%" height={200}>
+                <ResponsiveContainer width="100%" height={160}>
                   <PieChart>
                     <Pie
                       data={sourceData}
                       cx="50%"
                       cy="50%"
-                      innerRadius={50}
-                      outerRadius={75}
+                      innerRadius={40}
+                      outerRadius={60}
                       paddingAngle={2}
                       dataKey="value"
                       label={({ name, value }) => `${name}: ${value}`}
@@ -349,74 +336,74 @@ export function OverviewView({ students, sessions, getStudent }: OverviewViewPro
                 </ResponsiveContainer>
               </div>
             ) : (
-              <div className="h-[200px] flex items-center justify-center text-muted-foreground text-sm">
+              <div className="h-[160px] flex items-center justify-center text-muted-foreground text-sm">
                 暂无学员
               </div>
             )}
           </CardContent>
         </Card>
-      </div>
 
-      {/* Student Source Table */}
-      <Card className="bg-card border-border">
-        <CardHeader className="px-3 md:px-6 pt-3 md:pt-6 pb-2">
-          <CardTitle className="text-sm md:text-base text-foreground">学员来源统计</CardTitle>
-        </CardHeader>
-        <CardContent className="px-3 md:px-6 pb-3 md:pb-6">
-          <div className="overflow-x-auto -mx-3 md:mx-0">
-            <table className="w-full min-w-[300px]">
-              <thead>
-                <tr className="border-b border-border">
-                  <th className="px-2 md:px-4 py-2 text-left text-xs font-medium text-muted-foreground">来源</th>
-                  <th className="px-2 md:px-4 py-2 text-center text-xs font-medium text-muted-foreground">人数</th>
-                  <th className="px-2 md:px-4 py-2 text-center text-xs font-medium text-muted-foreground">占比</th>
-                  <th className="px-2 md:px-4 py-2 text-right text-xs font-medium text-muted-foreground">课程收费</th>
-                </tr>
-              </thead>
-              <tbody>
-                {['social_media', 'referral', 'friend', 'other'].map((source) => {
-                  const sourceStudents = students.filter(s => (s.source || 'other') === source)
-                  const count = sourceStudents.length
-                  const percentage = students.length > 0 ? ((count / students.length) * 100).toFixed(1) : '0'
-                  const totalFee = sourceStudents.reduce((sum, s) => sum + (s.totalFee || 0), 0)
-                  
-                  return (
-                    <tr key={source} className="border-b border-border last:border-b-0">
-                      <td className="px-2 md:px-4 py-2 text-xs md:text-sm text-foreground">{sourceLabels[source]}</td>
-                      <td className="px-2 md:px-4 py-2 text-xs md:text-sm text-center text-foreground">{count}</td>
-                      <td className="px-2 md:px-4 py-2 text-xs md:text-sm text-center text-foreground">{percentage}%</td>
-                      <td className="px-2 md:px-4 py-2 text-xs md:text-sm text-right text-primary font-medium">¥{totalFee.toLocaleString()}</td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-          </div>
-        </CardContent>
-      </Card>
+        {/* Student Source Table */}
+        <Card className="bg-card border-border">
+          <CardHeader className="px-3 pt-2 pb-1 md:px-4 md:pt-3">
+            <CardTitle className="text-sm text-foreground">学员来源统计</CardTitle>
+          </CardHeader>
+          <CardContent className="px-3 pb-3 md:px-4 md:pb-4">
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b border-border">
+                    <th className="px-2 py-1.5 text-left text-xs font-medium text-muted-foreground">来源</th>
+                    <th className="px-2 py-1.5 text-center text-xs font-medium text-muted-foreground">人数</th>
+                    <th className="px-2 py-1.5 text-center text-xs font-medium text-muted-foreground">占比</th>
+                    <th className="px-2 py-1.5 text-right text-xs font-medium text-muted-foreground">课程收费</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {['social_media', 'referral', 'friend', 'other'].map((source) => {
+                    const sourceStudents = students.filter(s => (s.source || 'other') === source)
+                    const count = sourceStudents.length
+                    const percentage = students.length > 0 ? ((count / students.length) * 100).toFixed(1) : '0'
+                    const totalFee = sourceStudents.reduce((sum, s) => sum + (s.totalFee || 0), 0)
+                    
+                    return (
+                      <tr key={source} className="border-b border-border last:border-b-0">
+                        <td className="px-2 py-1.5 text-xs text-foreground">{sourceLabels[source]}</td>
+                        <td className="px-2 py-1.5 text-xs text-center text-foreground">{count}</td>
+                        <td className="px-2 py-1.5 text-xs text-center text-foreground">{percentage}%</td>
+                        <td className="px-2 py-1.5 text-xs text-right text-primary font-medium">¥{totalFee.toLocaleString()}</td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
 
       {/* Student Progress */}
       <Card className="bg-card border-border">
-        <CardHeader className="px-3 md:px-6 pt-3 md:pt-6 pb-2">
-          <CardTitle className="text-sm md:text-base text-foreground">学员进度</CardTitle>
+        <CardHeader className="px-3 pt-2 pb-1 md:px-4 md:pt-3">
+          <CardTitle className="text-sm text-foreground">学员进度</CardTitle>
         </CardHeader>
-        <CardContent className="px-3 md:px-6 pb-3 md:pb-6">
+        <CardContent className="px-3 pb-3 md:px-4 md:pb-4">
           {studentProgressData.length > 0 ? (
-            <div className="space-y-3">
+            <div className="space-y-2">
               {studentProgressData.map((student, i) => (
-                <div key={i} className="space-y-1">
-                  <div className="flex justify-between text-xs md:text-sm">
+                <div key={i} className="space-y-0.5">
+                  <div className="flex justify-between text-xs">
                     <span className="text-foreground">{student.name}</span>
                     <span className="text-muted-foreground">
                       {student.completed} / {student.completed + student.remaining}
                     </span>
                   </div>
-                  <Progress value={student.progress} className="h-1.5 md:h-2" />
+                  <Progress value={student.progress} className="h-1" />
                 </div>
               ))}
             </div>
           ) : (
-            <div className="h-[120px] flex items-center justify-center text-muted-foreground text-sm">
+            <div className="h-[80px] flex items-center justify-center text-muted-foreground text-sm">
               暂无学员
             </div>
           )}

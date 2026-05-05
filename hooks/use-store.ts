@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import type { Student, Session, RenewalRecord, CourseType, StudentSource } from '@/lib/types'
+import type { Student, Session, RenewalRecord } from '@/lib/types'
 
 const STUDENTS_KEY = 'coach-students'
 const SESSIONS_KEY = 'coach-sessions'
@@ -62,7 +62,7 @@ export function useStore() {
   }, [])
 
   // Renewal operation - add more sessions without creating new contract
-  const renewStudent = useCallback((id: string, addedSessions: number, addedFee: number) => {
+  const renewStudent = useCallback((id: string, addedSessions: number, addedFee: number, addedVenueFee: number = 0) => {
     setStudents(prev => prev.map(s => {
       if (s.id !== id) return s
       
@@ -75,12 +75,30 @@ export function useStore() {
         id: crypto.randomUUID(),
         addedSessions,
         addedFee,
+        addedVenueFee,
         remainingAtRenewal: remaining,
         date: new Date().toISOString(),
+        confirmed: false,
       }
       
-      const newTotalSessions = s.totalSessions + addedSessions
-      const newTotalFee = s.totalFee + addedFee
+      // Don't add to actual totals yet - only when confirmed
+      return {
+        ...s,
+        renewalHistory: [...(s.renewalHistory || []), renewalRecord],
+      }
+    }))
+  }, [sessions])
+
+  // Confirm renewal - move from pending to actual
+  const confirmRenewal = useCallback((studentId: string, renewalId: string) => {
+    setStudents(prev => prev.map(s => {
+      if (s.id !== studentId) return s
+      
+      const renewal = (s.renewalHistory || []).find(r => r.id === renewalId)
+      if (!renewal || renewal.confirmed) return s
+
+      const newTotalSessions = s.totalSessions + renewal.addedSessions
+      const newTotalFee = s.totalFee + renewal.addedFee
       const newSessionPrice = newTotalSessions > 0 ? newTotalFee / newTotalSessions : 0
       
       return {
@@ -88,10 +106,14 @@ export function useStore() {
         totalSessions: newTotalSessions,
         totalFee: newTotalFee,
         sessionPrice: newSessionPrice,
-        renewalHistory: [...(s.renewalHistory || []), renewalRecord],
+        venueFee: renewal.addedVenueFee || s.venueFee,
+        sessionIncome: newSessionPrice - (renewal.addedVenueFee || s.venueFee),
+        renewalHistory: (s.renewalHistory || []).map(r =>
+          r.id === renewalId ? { ...r, confirmed: true } : r
+        ),
       }
     }))
-  }, [sessions])
+  }, [])
 
   // Session operations
   const addSession = useCallback((session: Omit<Session, 'id' | 'createdAt'>) => {
@@ -109,7 +131,6 @@ export function useStore() {
       const oldSession = prev.find(s => s.id === id)
       const newSessions = prev.map(s => s.id === id ? { ...s, ...updates } : s)
       
-      // If marking as completed, update student's completedSessions
       if (oldSession && oldSession.status === 'planned' && updates.status === 'completed') {
         setStudents(prevStudents => 
           prevStudents.map(student => 
@@ -128,22 +149,18 @@ export function useStore() {
     setSessions(prev => prev.filter(s => s.id !== id))
   }, [])
 
-  // Get student by ID
   const getStudent = useCallback((id: string) => {
     return students.find(s => s.id === id)
   }, [students])
 
-  // Get sessions for a student
   const getStudentSessions = useCallback((studentId: string) => {
     return sessions.filter(s => s.studentId === studentId)
   }, [sessions])
 
-  // Get sessions for a date range
   const getSessionsInRange = useCallback((startDate: string, endDate: string) => {
     return sessions.filter(s => s.date >= startDate && s.date <= endDate)
   }, [sessions])
 
-  // Export data
   const exportData = useCallback(() => {
     const data = {
       students,
@@ -159,7 +176,6 @@ export function useStore() {
     URL.revokeObjectURL(url)
   }, [students, sessions])
 
-  // Import data
   const importData = useCallback((jsonString: string) => {
     try {
       const data = JSON.parse(jsonString)
@@ -175,7 +191,6 @@ export function useStore() {
     }
   }, [])
 
-  // Calculate stats
   const getCompletedSessions = useCallback(() => {
     return sessions.filter(s => s.status === 'completed')
   }, [sessions])
@@ -191,7 +206,7 @@ export function useStore() {
     return getCompletedSessions().reduce((total, session) => {
       const student = getStudent(session.studentId)
       if (!student) return total
-      return total + (student.sessionPrice - student.venueFee)
+      return total + (student.sessionIncome || (student.sessionPrice - student.venueFee))
     }, 0)
   }, [getCompletedSessions, getStudent])
 
@@ -203,6 +218,7 @@ export function useStore() {
     updateStudent,
     deleteStudent,
     renewStudent,
+    confirmRenewal,
     addSession,
     updateSession,
     deleteSession,

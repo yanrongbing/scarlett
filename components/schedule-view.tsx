@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useRef, type KeyboardEvent } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import {
@@ -100,6 +100,7 @@ export function ScheduleView({
   const [formStudentId, setFormStudentId] = useState('')
   const [formTime, setFormTime] = useState('')
   const [formLocation, setFormLocation] = useState('')
+  const locationRef = useRef<HTMLInputElement>(null)
 
   const weekDates = useMemo(() => getWeekDates(currentDate), [currentDate])
   
@@ -145,6 +146,12 @@ export function ScheduleView({
     })
   }
 
+  const handleLocationKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      e.preventDefault()
+    }
+  }
+
   const handleAddSession = () => {
     if (!selectedSlot || !formStudentId || !formTime) return
     onAddSession({
@@ -159,7 +166,7 @@ export function ScheduleView({
   }
 
   return (
-    <div className="space-y-4 md:space-y-6">
+    <div className="space-y-3 md:space-y-4">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
           <h2 className="text-xl md:text-2xl font-semibold text-foreground">训练课表</h2>
@@ -185,18 +192,23 @@ export function ScheduleView({
               {/* Header */}
               <div className="grid grid-cols-8 border-b border-border">
                 <div className="p-2 text-xs font-medium text-muted-foreground">时间</div>
-                {weekDates.map((date, i) => (
-                  <div 
-                    key={i} 
-                    className={cn(
-                      "p-2 text-center border-l border-border",
-                      formatDate(date) === formatDate(new Date()) && "bg-primary/10"
-                    )}
-                  >
-                    <div className="text-xs font-medium text-foreground">{DAYS[i]}</div>
-                    <div className="text-xs text-muted-foreground">{formatDateShort(date)}</div>
-                  </div>
-                ))}
+                {weekDates.map((date, i) => {
+                  const isToday = formatDate(date) === formatDate(new Date())
+                  const isWeekend = i >= 5 // 周六(5)、周日(6)
+                  return (
+                    <div 
+                      key={i} 
+                      className={cn(
+                        "p-2 text-center border-l border-border",
+                        isToday && "bg-primary/10",
+                        isWeekend && !isToday && "bg-muted/60"
+                      )}
+                    >
+                      <div className="text-xs font-medium text-foreground">{DAYS[i]}</div>
+                      <div className="text-xs text-muted-foreground">{formatDateShort(date)}</div>
+                    </div>
+                  )
+                })}
               </div>
               
               {/* Time blocks (2 hours each) */}
@@ -209,13 +221,16 @@ export function ScheduleView({
                     const dateStr = formatDate(date)
                     const session = getSessionForSlot(dateStr, block.start)
                     const student = session ? getStudent(session.studentId) : null
+                    const isToday = formatDate(date) === formatDate(new Date())
+                    const isWeekend = i >= 5
                     
                     return (
                       <div
                         key={i}
                         className={cn(
                           "p-1.5 border-l border-border min-h-[70px] transition-colors",
-                          formatDate(date) === formatDate(new Date()) && "bg-primary/5",
+                          isToday && "bg-primary/5",
+                          isWeekend && !isToday && "bg-muted/40",
                           !session && "hover:bg-secondary cursor-pointer"
                         )}
                         onClick={() => !session && handleSlotClick(dateStr, block.start)}
@@ -288,13 +303,13 @@ export function ScheduleView({
           <DialogHeader>
             <DialogTitle className="text-foreground text-base">排课</DialogTitle>
           </DialogHeader>
-          <div className="space-y-4">
+          <div className="space-y-3">
             <div className="flex items-center gap-3 text-xs text-muted-foreground bg-muted/50 p-2 rounded-lg">
               <Clock className="w-4 h-4" />
               <span>{selectedSlot?.date}</span>
             </div>
             
-            <div className="space-y-2">
+            <div className="space-y-1.5">
               <Label className="text-foreground text-sm">选择学员</Label>
               <Select value={formStudentId} onValueChange={setFormStudentId}>
                 <SelectTrigger className="bg-input h-9">
@@ -308,7 +323,7 @@ export function ScheduleView({
               </Select>
             </div>
 
-            <div className="space-y-2">
+            <div className="space-y-1.5">
               <Label className="text-foreground text-sm">具体时间</Label>
               <Select value={formTime} onValueChange={setFormTime}>
                 <SelectTrigger className="bg-input h-9">
@@ -322,11 +337,13 @@ export function ScheduleView({
               </Select>
             </div>
             
-            <div className="space-y-2">
+            <div className="space-y-1.5">
               <Label className="text-foreground text-sm">地点 (可选)</Label>
               <Input
+                ref={locationRef}
                 value={formLocation}
                 onChange={(e) => setFormLocation(e.target.value)}
+                onKeyDown={handleLocationKeyDown}
                 placeholder="请输入上课地点"
                 className="bg-input h-9"
               />

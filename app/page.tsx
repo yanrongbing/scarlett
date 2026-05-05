@@ -50,7 +50,7 @@ export default function CoachManagerPage() {
       
       {/* Main content with responsive padding */}
       <main className="lg:ml-64 pt-16 lg:pt-0 min-h-screen">
-        <div className="p-4 sm:p-6 lg:p-8">
+        <div className="p-3 sm:p-4 lg:p-6">
           {activeTab === 'overview' && (
             <OverviewView 
               students={store.students}
@@ -67,6 +67,7 @@ export default function CoachManagerPage() {
               onUpdateStudent={store.updateStudent}
               onDeleteStudent={store.deleteStudent}
               onRenewStudent={store.renewStudent}
+              onConfirmRenewal={store.confirmRenewal}
             />
           )}
           

@@ -6,8 +6,10 @@ export interface RenewalRecord {
   id: string
   addedSessions: number
   addedFee: number
+  addedVenueFee: number
   remainingAtRenewal: number
   date: string
+  confirmed: boolean
 }
 
 export interface Student {

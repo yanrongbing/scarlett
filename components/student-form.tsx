@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useRef, type KeyboardEvent } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -47,10 +47,15 @@ export function StudentForm({ open, onOpenChange, onSubmit, initialData }: Stude
   const [totalSessions, setTotalSessions] = useState('')
   const [totalFee, setTotalFee] = useState('')
   const [venueFee, setVenueFee] = useState('')
-  const [sessionIncome, setSessionIncome] = useState('')
   const [trainingBackground, setTrainingBackground] = useState('')
   const [trainingPlanPdf, setTrainingPlanPdf] = useState<string | undefined>()
   const [contractPdf, setContractPdf] = useState<string | undefined>()
+
+  // Refs for Enter-to-next-field
+  const nameRef = useRef<HTMLInputElement>(null)
+  const totalFeeRef = useRef<HTMLInputElement>(null)
+  const totalSessionsRef = useRef<HTMLInputElement>(null)
+  const venueFeeRef = useRef<HTMLInputElement>(null)
 
   // Reset form when dialog opens/closes or initialData changes
   useEffect(() => {
@@ -61,19 +66,16 @@ export function StudentForm({ open, onOpenChange, onSubmit, initialData }: Stude
       setTotalSessions(initialData.totalSessions?.toString() || '')
       setTotalFee(initialData.totalFee?.toString() || '')
       setVenueFee(initialData.venueFee?.toString() || '')
-      setSessionIncome(initialData.sessionIncome?.toString() || '')
       setTrainingBackground(initialData.trainingBackground || '')
       setTrainingPlanPdf(initialData.trainingPlanPdf)
       setContractPdf(initialData.contractPdf)
     } else if (open && !initialData) {
-      // Reset for new student
       setName('')
       setCourseType('offline')
       setSource('social_media')
       setTotalSessions('')
       setTotalFee('')
       setVenueFee('')
-      setSessionIncome('')
       setTrainingBackground('')
       setTrainingPlanPdf(undefined)
       setContractPdf(undefined)
@@ -89,6 +91,19 @@ export function StudentForm({ open, onOpenChange, onSubmit, initialData }: Stude
     }
     return 0
   }, [totalSessions, totalFee])
+
+  // Auto-calculate: 单节利润 = 单次课费 - 场地费
+  const sessionIncome = useMemo(() => {
+    const venue = parseFloat(venueFee) || 0
+    return sessionPrice - venue
+  }, [sessionPrice, venueFee])
+
+  const handleKeyDown = (e: KeyboardEvent<HTMLInputElement>, nextRef: React.RefObject<HTMLInputElement | null> | null) => {
+    if (e.key === 'Enter') {
+      e.preventDefault()
+      nextRef?.current?.focus()
+    }
+  }
 
   const handleFileUpload = (
     e: React.ChangeEvent<HTMLInputElement>,
@@ -114,7 +129,7 @@ export function StudentForm({ open, onOpenChange, onSubmit, initialData }: Stude
       totalFee: parseFloat(totalFee) || 0,
       sessionPrice,
       venueFee: parseFloat(venueFee) || 0,
-      sessionIncome: parseFloat(sessionIncome) || 0,
+      sessionIncome,
       trainingBackground,
       trainingPlanPdf,
       contractPdf,
@@ -130,20 +145,22 @@ export function StudentForm({ open, onOpenChange, onSubmit, initialData }: Stude
             {initialData ? '编辑学员' : '添加学员'}
           </DialogTitle>
         </DialogHeader>
-        <form onSubmit={handleSubmit} className="space-y-5">
+        <form onSubmit={handleSubmit} className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
+            <div className="space-y-1.5">
               <Label htmlFor="name" className="text-foreground">姓名</Label>
               <Input
+                ref={nameRef}
                 id="name"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
+                onKeyDown={(e) => handleKeyDown(e, totalFeeRef)}
                 placeholder="请输入姓名"
                 required
                 className="bg-input"
               />
             </div>
-            <div className="space-y-2">
+            <div className="space-y-1.5">
               <Label htmlFor="courseType" className="text-foreground">课程类型</Label>
               <Select value={courseType} onValueChange={(v) => setCourseType(v as CourseType)}>
                 <SelectTrigger className="bg-input">
@@ -158,7 +175,7 @@ export function StudentForm({ open, onOpenChange, onSubmit, initialData }: Stude
             </div>
           </div>
 
-          <div className="space-y-2">
+          <div className="space-y-1.5">
             <Label htmlFor="source" className="text-foreground">学员来源</Label>
             <Select value={source} onValueChange={(v) => setSource(v as StudentSource)}>
               <SelectTrigger className="bg-input">
@@ -173,25 +190,29 @@ export function StudentForm({ open, onOpenChange, onSubmit, initialData }: Stude
           </div>
           
           <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
+            <div className="space-y-1.5">
               <Label htmlFor="totalFee" className="text-foreground">课程收费 (元)</Label>
               <Input
+                ref={totalFeeRef}
                 id="totalFee"
                 type="number"
                 value={totalFee}
                 onChange={(e) => setTotalFee(e.target.value)}
+                onKeyDown={(e) => handleKeyDown(e, totalSessionsRef)}
                 placeholder="0"
                 min="0"
                 className="bg-input"
               />
             </div>
-            <div className="space-y-2">
+            <div className="space-y-1.5">
               <Label htmlFor="totalSessions" className="text-foreground">课时</Label>
               <Input
+                ref={totalSessionsRef}
                 id="totalSessions"
                 type="number"
                 value={totalSessions}
                 onChange={(e) => setTotalSessions(e.target.value)}
+                onKeyDown={(e) => handleKeyDown(e, venueFeeRef)}
                 placeholder="0"
                 min="0"
                 className="bg-input"
@@ -199,41 +220,33 @@ export function StudentForm({ open, onOpenChange, onSubmit, initialData }: Stude
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="venueFee" className="text-foreground">场地费 (元/次)</Label>
-              <Input
-                id="venueFee"
-                type="number"
-                value={venueFee}
-                onChange={(e) => setVenueFee(e.target.value)}
-                placeholder="0"
-                min="0"
-                className="bg-input"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="sessionIncome" className="text-foreground">单节课收入 (元)</Label>
-              <Input
-                id="sessionIncome"
-                type="number"
-                value={sessionIncome}
-                onChange={(e) => setSessionIncome(e.target.value)}
-                placeholder="0"
-                min="0"
-                className="bg-input"
-              />
-            </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="venueFee" className="text-foreground">场地费 (元/次)</Label>
+            <Input
+              ref={venueFeeRef}
+              id="venueFee"
+              type="number"
+              value={venueFee}
+              onChange={(e) => setVenueFee(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter') e.preventDefault() }}
+              placeholder="0"
+              min="0"
+              className="bg-input"
+            />
           </div>
 
-          <div className="p-3 bg-muted rounded-lg">
+          <div className="p-3 bg-muted rounded-lg space-y-2">
             <div className="flex justify-between items-center">
               <span className="text-sm text-muted-foreground">单次课费 (自动计算)</span>
               <span className="font-semibold text-foreground">¥{sessionPrice.toFixed(2)}</span>
             </div>
+            <div className="flex justify-between items-center">
+              <span className="text-sm text-muted-foreground">单节课收入 (课费 - 场地费)</span>
+              <span className="font-semibold text-primary">¥{sessionIncome.toFixed(2)}</span>
+            </div>
           </div>
           
-          <div className="space-y-2">
+          <div className="space-y-1.5">
             <Label htmlFor="trainingBackground" className="text-foreground">训练背景和目标</Label>
             <p className="text-xs text-muted-foreground">学员基本情况，训练诉求，初次沟通后确认的关键问题等。</p>
             <Textarea
@@ -241,12 +254,12 @@ export function StudentForm({ open, onOpenChange, onSubmit, initialData }: Stude
               value={trainingBackground}
               onChange={(e) => setTrainingBackground(e.target.value)}
               placeholder="请输入学员的训练背景和目标..."
-              rows={4}
+              rows={3}
               className="bg-input"
             />
           </div>
 
-          <div className="space-y-2">
+          <div className="space-y-1.5">
             <Label className="text-foreground">训练计划 PDF（可选）</Label>
             <div className="flex items-center gap-3">
               {trainingPlanPdf ? (
@@ -278,7 +291,7 @@ export function StudentForm({ open, onOpenChange, onSubmit, initialData }: Stude
             </div>
           </div>
 
-          <div className="space-y-2">
+          <div className="space-y-1.5">
             <Label className="text-foreground">合同文档（可选）</Label>
             <div className="flex items-center gap-3">
               {contractPdf ? (
@@ -310,7 +323,7 @@ export function StudentForm({ open, onOpenChange, onSubmit, initialData }: Stude
             </div>
           </div>
           
-          <div className="flex justify-end gap-3 pt-4 border-t border-border">
+          <div className="flex justify-end gap-3 pt-3 border-t border-border">
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
               取消
             </Button>
