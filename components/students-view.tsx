@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, Fragment } from 'react'
+import { useState, Fragment, useMemo } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -8,7 +8,7 @@ import { Progress } from '@/components/ui/progress'
 import { Checkbox } from '@/components/ui/checkbox'
 import { StudentForm } from './student-form'
 import { RenewalForm } from './renewal-form'
-import { Plus, Edit2, Trash2, User, RefreshCw, FileText, AlertCircle, LayoutGrid, List, CheckCircle, Star, ChevronDown, ChevronRight, Play, Pause } from 'lucide-react'
+import { Plus, Edit2, Trash2, User, RefreshCw, FileText, LayoutGrid, List, CheckCircle, Star, ChevronDown, ChevronRight, Play, Pause, ArrowUpDown, ArrowUp, ArrowDown, DollarSign, XCircle } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { getStudentProgress, formatProfit, calculateCompositeScore } from '@/lib/utils-helper'
 import type { Student, Session } from '@/lib/types'
@@ -24,6 +24,9 @@ interface StudentsViewProps {
   onDeleteRenewal: (studentId: string, renewalId: string) => void
   onSelectStudent?: (student: Student) => void
   onRestartCourse?: (studentId: string, addedSessions: number, addedFee: number, addedVenueFee: number) => void
+  onEndCourse?: (studentId: string) => void
+  onPauseCourse?: (studentId: string) => void
+  onRefundCourse?: (studentId: string, refundAmount: number) => void
 }
 
 const courseTypeLabels: Record<string, string> = {
@@ -43,6 +46,9 @@ const sourceLabels: Record<string, string> = {
   other: '其他',
 }
 
+type SortField = 'remaining' | 'progress' | 'rating' | 'profit' | 'sessionProfit'
+type SortDirection = 'asc' | 'desc'
+
 export function StudentsView({ 
   students, 
   sessions,
@@ -54,6 +60,9 @@ export function StudentsView({
   onDeleteRenewal,
   onSelectStudent,
   onRestartCourse,
+  onEndCourse,
+  onPauseCourse,
+  onRefundCourse,
 }: StudentsViewProps) {
   const [isFormOpen, setIsFormOpen] = useState(false)
   const [isRenewalOpen, setIsRenewalOpen] = useState(false)
@@ -64,6 +73,13 @@ export function StudentsView({
   const [showPausedList, setShowPausedList] = useState(false)
   const [restartingStudent, setRestartingStudent] = useState<Student | null>(null)
   const [restartForm, setRestartForm] = useState({ sessions: '', fee: '', venueFee: '' })
+  const [sortField, setSortField] = useState<SortField | null>(null)
+  const [sortDirection, setSortDirection] = useState<SortDirection>('desc')
+  
+  // 退费弹窗状态
+  const [refundingStudent, setRefundingStudent] = useState<Student | null>(null)
+  const [refundAmount, setRefundAmount] = useState('')
+  const [refundConfirm, setRefundConfirm] = useState(false)
 
   const handleEdit = (student: Student) => {
     setEditingStudent(student)
@@ -91,7 +107,7 @@ export function StudentsView({
     const progress = student.totalSessions > 0 ? (completedSessions / student.totalSessions) * 100 : 0
     const sessionProfit = student.sessionIncome || (student.sessionPrice - student.venueFee)
     const profit = completedSessions * sessionProfit
-    const showRenewal = remainingSessions <= 4 && remainingSessions >= 0
+    const needRenewal = remainingSessions <= 4 && remainingSessions >= 0
     
     // Get progress info with dynamic color
     const progressInfo = getStudentProgress(student)
@@ -109,7 +125,7 @@ export function StudentsView({
       remainingSessions, 
       progress, 
       profit, 
-      showRenewal, 
+      needRenewal, 
       sessionProfit, 
       pendingRenewals, 
       confirmedRenewals,
@@ -123,6 +139,72 @@ export function StudentsView({
   const pausedStudents = students.filter(s => s.status === 'paused')
   const endedStudents = students.filter(s => s.status === 'ended')
 
+  // 排序后的活跃学员
+  const sortedActiveStudents = useMemo(() => {
+    if (!sortField) return activeStudents
+    
+    return [...activeStudents].sort((a, b) => {
+      const statsA = getStudentStats(a)
+      const statsB = getStudentStats(b)
+      
+      let valueA: number, valueB: number
+      
+      switch (sortField) {
+        case 'remaining':
+          valueA = statsA.remainingSessions
+          valueB = statsB.remainingSessions
+          break
+        case 'progress':
+          valueA = statsA.progress
+          valueB = statsB.progress
+          break
+        case 'rating':
+          valueA = statsA.compositeScore
+          valueB = statsB.compositeScore
+          break
+        case 'profit':
+          valueA = statsA.profit
+          valueB = statsB.profit
+          break
+        case 'sessionProfit':
+          valueA = statsA.sessionProfit
+          valueB = statsB.sessionProfit
+          break
+        default:
+          return 0
+      }
+      
+      if (sortDirection === 'asc') {
+        return valueA - valueB
+      } else {
+        return valueB - valueA
+      }
+    })
+  }, [activeStudents, sortField, sortDirection, sessions])
+
+  const handleSort = (field: SortField) => {
+    if (sortField === field) {
+      if (sortDirection === 'desc') {
+        setSortDirection('asc')
+      } else {
+        setSortField(null)
+        setSortDirection('desc')
+      }
+    } else {
+      setSortField(field)
+      setSortDirection('desc')
+    }
+  }
+
+  const getSortIcon = (field: SortField) => {
+    if (sortField !== field) {
+      return <ArrowUpDown className="w-3 h-3 ml-1 opacity-50" />
+    }
+    return sortDirection === 'desc' 
+      ? <ArrowDown className="w-3 h-3 ml-1" />
+      : <ArrowUp className="w-3 h-3 ml-1" />
+  }
+
   const handleRestartSubmit = () => {
     if (!restartingStudent || !onRestartCourse) return
     const addedSessions = parseInt(restartForm.sessions) || 0
@@ -133,6 +215,76 @@ export function StudentsView({
       setRestartingStudent(null)
       setRestartForm({ sessions: '', fee: '', venueFee: '' })
     }
+  }
+
+  // 退费处理
+  const handleRefundStart = (student: Student) => {
+    setRefundingStudent(student)
+    setRefundAmount('')
+    setRefundConfirm(false)
+  }
+
+  const handleRefundSubmit = () => {
+    if (!refundingStudent || !onRefundCourse) return
+    const amount = parseFloat(refundAmount)
+    if (isNaN(amount) || amount <= 0) return
+    
+    if (!refundConfirm) {
+      setRefundConfirm(true)
+      return
+    }
+    
+    onRefundCourse(refundingStudent.id, amount)
+    setRefundingStudent(null)
+    setRefundAmount('')
+    setRefundConfirm(false)
+  }
+
+  // 操作按钮组件
+  const ActionButtons = ({ student, stats, compact = false }: { student: Student; stats: ReturnType<typeof getStudentStats>; compact?: boolean }) => {
+    const buttonClass = compact ? "h-6 text-xs px-2" : "h-7 text-xs px-2"
+    
+    return (
+      <div className={cn("flex gap-1", compact ? "flex-wrap" : "")}>
+        <Button
+          size="sm"
+          className={cn(
+            buttonClass,
+            stats.needRenewal 
+              ? "bg-success hover:bg-success/90 text-white animate-pulse" 
+              : "bg-success hover:bg-success/90 text-white"
+          )}
+          onClick={(e) => { e.stopPropagation(); handleRenewal(student) }}
+        >
+          <RefreshCw className="w-3 h-3 mr-1" />
+          续课
+        </Button>
+        <Button
+          size="sm"
+          className={cn(buttonClass, "bg-primary hover:bg-primary/90 text-white")}
+          onClick={(e) => { e.stopPropagation(); onPauseCourse?.(student.id) }}
+        >
+          <Pause className="w-3 h-3 mr-1" />
+          暂停
+        </Button>
+        <Button
+          size="sm"
+          className={cn(buttonClass, "bg-foreground hover:bg-foreground/90 text-background")}
+          onClick={(e) => { e.stopPropagation(); onEndCourse?.(student.id) }}
+        >
+          <CheckCircle className="w-3 h-3 mr-1" />
+          结课
+        </Button>
+        <Button
+          size="sm"
+          className={cn(buttonClass, "bg-destructive hover:bg-destructive/90 text-white")}
+          onClick={(e) => { e.stopPropagation(); handleRefundStart(student) }}
+        >
+          <DollarSign className="w-3 h-3 mr-1" />
+          退费
+        </Button>
+      </div>
+    )
   }
 
   return (
@@ -180,54 +332,80 @@ export function StudentsView({
         <Card className="bg-card border-border">
           <CardContent className="p-0">
             <div className="overflow-x-auto">
-              <table className="w-full min-w-[640px]">
+              <table className="w-full min-w-[900px]">
                 <thead>
                   <tr className="border-b border-border bg-muted/30">
-                    <th className="px-4 py-3 text-left text-sm font-medium text-muted-foreground">学员</th>
-                    <th className="px-4 py-3 text-center text-sm font-medium text-muted-foreground">类型</th>
-                    <th className="px-4 py-3 text-center text-sm font-medium text-muted-foreground">来源</th>
-                    <th className="px-4 py-3 text-center text-sm font-medium text-muted-foreground">课时</th>
-                    <th className="px-4 py-3 text-center text-sm font-medium text-muted-foreground">进度</th>
-                    <th className="px-4 py-3 text-center text-sm font-medium text-muted-foreground">评分</th>
-                    <th className="px-4 py-3 text-right text-sm font-medium text-muted-foreground">利润</th>
-                    <th className="px-4 py-3 text-center text-sm font-medium text-muted-foreground">操作</th>
+                    <th className="px-3 py-3 text-left text-sm font-medium text-muted-foreground">学员</th>
+                    <th className="px-2 py-3 text-center text-sm font-medium text-muted-foreground">类型</th>
+                    <th 
+                      className="px-2 py-3 text-center text-sm font-medium text-muted-foreground cursor-pointer hover:text-foreground"
+                      onClick={() => handleSort('remaining')}
+                    >
+                      <div className="flex items-center justify-center">
+                        课时{getSortIcon('remaining')}
+                      </div>
+                    </th>
+                    <th 
+                      className="px-2 py-3 text-center text-sm font-medium text-muted-foreground cursor-pointer hover:text-foreground"
+                      onClick={() => handleSort('progress')}
+                    >
+                      <div className="flex items-center justify-center">
+                        进度{getSortIcon('progress')}
+                      </div>
+                    </th>
+                    <th 
+                      className="px-2 py-3 text-center text-sm font-medium text-muted-foreground cursor-pointer hover:text-foreground"
+                      onClick={() => handleSort('rating')}
+                    >
+                      <div className="flex items-center justify-center">
+                        评分{getSortIcon('rating')}
+                      </div>
+                    </th>
+                    <th 
+                      className="px-2 py-3 text-right text-sm font-medium text-muted-foreground cursor-pointer hover:text-foreground"
+                      onClick={() => handleSort('profit')}
+                    >
+                      <div className="flex items-center justify-end">
+                        总利润{getSortIcon('profit')}
+                      </div>
+                    </th>
+                    <th 
+                      className="px-2 py-3 text-right text-sm font-medium text-muted-foreground cursor-pointer hover:text-foreground"
+                      onClick={() => handleSort('sessionProfit')}
+                    >
+                      <div className="flex items-center justify-end">
+                        单节利润{getSortIcon('sessionProfit')}
+                      </div>
+                    </th>
+                    <th className="px-3 py-3 text-center text-sm font-medium text-muted-foreground">操作</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {activeStudents.map(student => {
+                  {sortedActiveStudents.map(student => {
                     const stats = getStudentStats(student)
                     const courseType = student.courseType || 'offline'
                     return (
                       <Fragment key={student.id}>
                         <tr 
-                          className={cn(
-                            "border-b border-border last:border-b-0 hover:bg-muted/30 cursor-pointer transition-colors",
-                            stats.showRenewal && "bg-warning/5"
-                          )}
+                          className="border-b border-border last:border-b-0 hover:bg-muted/30 cursor-pointer transition-colors"
                           onClick={() => onSelectStudent?.(student)}
                         >
-                          <td className="px-4 py-3">
+                          <td className="px-3 py-3">
                             <div className="flex items-center gap-2">
-                              {stats.showRenewal && (
-                                <AlertCircle className="w-4 h-4 text-warning flex-shrink-0" />
-                              )}
                               <span className="text-base font-medium text-foreground">{student.name}</span>
                             </div>
                           </td>
-                          <td className="px-4 py-3 text-center">
-                            <Badge className={cn("text-sm border", courseTypeColors[courseType])} variant="secondary">
+                          <td className="px-2 py-3 text-center">
+                            <Badge className={cn("text-xs border", courseTypeColors[courseType])} variant="secondary">
                               {courseTypeLabels[courseType]}
                             </Badge>
                           </td>
-                          <td className="px-4 py-3 text-center">
-                            <span className="text-sm text-muted-foreground">{sourceLabels[student.source] || '其他'}</span>
-                          </td>
-                          <td className="px-4 py-3 text-center">
+                          <td className="px-2 py-3 text-center">
                             <span className="text-sm text-foreground">{stats.completedSessions}/{student.totalSessions}</span>
                           </td>
-                          <td className="px-4 py-3 text-center">
+                          <td className="px-2 py-3 text-center">
                             <div className="flex items-center gap-2 justify-center">
-                              <div className="flex-1 h-2 bg-muted rounded-full overflow-hidden max-w-20">
+                              <div className="flex-1 h-2 bg-muted rounded-full overflow-hidden max-w-16">
                                 <div 
                                   className={cn(
                                     "h-full transition-all",
@@ -238,22 +416,25 @@ export function StudentsView({
                                   style={{ width: `${Math.min(stats.progress, 100)}%` }}
                                 />
                               </div>
-                              <span className="text-sm text-muted-foreground min-w-6 text-right">{stats.remainingSessions}</span>
+                              <span className="text-xs text-muted-foreground min-w-4 text-right">{stats.remainingSessions}</span>
                             </div>
                           </td>
-                          <td className="px-4 py-3 text-center">
+                          <td className="px-2 py-3 text-center">
                             {stats.compositeScore > 0 && (
                               <div className="flex items-center justify-center gap-1">
                                 <span className="text-sm font-medium">{stats.compositeScore.toFixed(1)}</span>
-                                <Star className="w-4 h-4 fill-yellow-400 text-yellow-400" />
+                                <Star className="w-3 h-3 fill-yellow-400 text-yellow-400" />
                               </div>
                             )}
                           </td>
-                          <td className="px-4 py-3 text-right">
+                          <td className="px-2 py-3 text-right">
                             <span className="text-sm font-medium text-success">¥{formatProfit(stats.profit)}</span>
                           </td>
-                          <td className="px-3 py-2">
-                            <div className="flex items-center justify-center gap-1" onClick={e => e.stopPropagation()}>
+                          <td className="px-2 py-3 text-right">
+                            <span className="text-sm text-muted-foreground">¥{formatProfit(stats.sessionProfit)}</span>
+                          </td>
+                          <td className="px-2 py-2" onClick={e => e.stopPropagation()}>
+                            <div className="flex items-center justify-center gap-1">
                               <Button 
                                 variant="ghost" 
                                 size="icon"
@@ -262,24 +443,7 @@ export function StudentsView({
                               >
                                 <Edit2 className="w-3 h-3" />
                               </Button>
-                              {stats.showRenewal && (
-                                <Button 
-                                  variant="ghost" 
-                                  size="icon"
-                                  className="h-6 w-6 text-warning"
-                                  onClick={() => handleRenewal(student)}
-                                >
-                                  <RefreshCw className="w-3 h-3" />
-                                </Button>
-                              )}
-                              <Button 
-                                variant="ghost" 
-                                size="icon"
-                                className="h-6 w-6 text-muted-foreground hover:text-destructive"
-                                onClick={() => onDeleteStudent(student.id)}
-                              >
-                                <Trash2 className="w-3 h-3" />
-                              </Button>
+                              <ActionButtons student={student} stats={stats} compact />
                             </div>
                           </td>
                         </tr>
@@ -354,25 +518,19 @@ export function StudentsView({
         </Card>
       ) : (
         <div className="grid gap-3 grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-          {activeStudents.map(student => {
+          {sortedActiveStudents.map(student => {
             const stats = getStudentStats(student)
             const courseType = student.courseType || 'offline'
             return (
               <Card 
                 key={student.id} 
-                className={cn(
-                  "bg-card border-border transition-shadow hover:shadow-md cursor-pointer",
-                  stats.showRenewal && "border-warning/50"
-                )}
+                className="bg-card border-border transition-shadow hover:shadow-md cursor-pointer"
                 onClick={() => onSelectStudent?.(student)}
               >
                 <CardContent className="p-3">
                   <div className="flex items-start justify-between mb-2">
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-1 mb-1">
-                        {stats.showRenewal && (
-                          <AlertCircle className="w-3 h-3 text-warning flex-shrink-0" />
-                        )}
                         <span className="text-sm font-medium text-foreground truncate">{student.name}</span>
                       </div>
                       <div className="flex gap-1 flex-wrap">
@@ -384,24 +542,14 @@ export function StudentsView({
                         </Badge>
                       </div>
                     </div>
-                    <div className="flex gap-0.5 flex-shrink-0">
-                      <Button 
-                        variant="ghost" 
-                        size="icon"
-                        className="h-6 w-6"
-                        onClick={() => handleEdit(student)}
-                      >
-                        <Edit2 className="w-3 h-3" />
-                      </Button>
-                      <Button 
-                        variant="ghost" 
-                        size="icon"
-                        className="h-6 w-6 text-muted-foreground hover:text-destructive"
-                        onClick={() => onDeleteStudent(student.id)}
-                      >
-                        <Trash2 className="w-3 h-3" />
-                      </Button>
-                    </div>
+                    <Button 
+                      variant="ghost" 
+                      size="icon"
+                      className="h-6 w-6 flex-shrink-0"
+                      onClick={(e) => { e.stopPropagation(); handleEdit(student) }}
+                    >
+                      <Edit2 className="w-3 h-3" />
+                    </Button>
                   </div>
 
                   <div className="space-y-2">
@@ -452,7 +600,7 @@ export function StudentsView({
                           variant="ghost"
                           size="icon"
                           className="h-4 w-4 text-muted-foreground hover:text-destructive"
-                          onClick={() => onDeleteRenewal(student.id, renewal.id)}
+                          onClick={(e) => { e.stopPropagation(); onDeleteRenewal(student.id, renewal.id) }}
                         >
                           <Trash2 className="w-2.5 h-2.5" />
                         </Button>
@@ -474,24 +622,17 @@ export function StudentsView({
                           variant="ghost"
                           size="icon"
                           className="h-4 w-4 text-muted-foreground hover:text-destructive"
-                          onClick={() => onDeleteRenewal(student.id, renewal.id)}
+                          onClick={(e) => { e.stopPropagation(); onDeleteRenewal(student.id, renewal.id) }}
                         >
                           <Trash2 className="w-2.5 h-2.5" />
                         </Button>
                       </div>
                     ))}
 
-                    {stats.showRenewal && (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="w-full h-7 text-xs gap-1 border-warning/50 text-warning hover:bg-warning/10"
-                        onClick={() => handleRenewal(student)}
-                      >
-                        <RefreshCw className="w-3 h-3" />
-                        续课计划
-                      </Button>
-                    )}
+                    {/* Action buttons */}
+                    <div className="pt-2 border-t border-border" onClick={e => e.stopPropagation()}>
+                      <ActionButtons student={student} stats={stats} compact />
+                    </div>
                   </div>
                 </CardContent>
               </Card>
@@ -566,6 +707,11 @@ export function StudentsView({
                     <div className="flex items-center gap-2">
                       <User className="w-4 h-4 text-muted-foreground" />
                       <span className="text-sm font-medium">{student.name}</span>
+                      {student.refundAmount && (
+                        <Badge variant="destructive" className="text-xs">
+                          退费 ¥{student.refundAmount.toLocaleString()}
+                        </Badge>
+                      )}
                       {student.endedAt && (
                         <span className="text-xs text-muted-foreground">
                           结课于 {new Date(student.endedAt).toLocaleDateString('zh-CN')}
@@ -638,6 +784,80 @@ export function StudentsView({
                   确认重启
                 </Button>
               </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* 退费弹窗 */}
+      {refundingStudent && (
+        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
+          <Card className="w-full max-w-md">
+            <CardContent className="p-6 space-y-4">
+              <div className="flex items-center gap-2">
+                <XCircle className="w-5 h-5 text-destructive" />
+                <h3 className="text-lg font-semibold">退费 - {refundingStudent.name}</h3>
+              </div>
+              
+              {!refundConfirm ? (
+                <>
+                  <div className="space-y-3">
+                    <div className="p-3 bg-muted/50 rounded-md text-sm space-y-1">
+                      <p>已完成课时：{sessions.filter(s => s.studentId === refundingStudent.id && s.status === 'completed').length} 节</p>
+                      <p>总收费：¥{refundingStudent.totalFee.toLocaleString()}</p>
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-sm font-medium">退费金额 (¥)</label>
+                      <input
+                        type="number"
+                        className="w-full px-3 py-2 border border-border rounded-md bg-background"
+                        placeholder="输入退费金额"
+                        value={refundAmount}
+                        onChange={(e) => setRefundAmount(e.target.value)}
+                      />
+                    </div>
+                    {refundAmount && parseFloat(refundAmount) > 0 && (
+                      <div className="p-3 bg-warning/10 rounded-md text-sm text-warning">
+                        退费后实际收费：¥{(refundingStudent.totalFee - parseFloat(refundAmount)).toLocaleString()}
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex gap-2 justify-end">
+                    <Button variant="outline" onClick={() => {
+                      setRefundingStudent(null)
+                      setRefundAmount('')
+                    }}>
+                      取消
+                    </Button>
+                    <Button 
+                      variant="destructive"
+                      onClick={handleRefundSubmit}
+                      disabled={!refundAmount || parseFloat(refundAmount) <= 0}
+                    >
+                      下一步
+                    </Button>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="p-4 bg-destructive/10 rounded-md space-y-2">
+                    <p className="text-sm font-medium text-destructive">确认退费信息</p>
+                    <p className="text-sm">退费金额：¥{parseFloat(refundAmount).toLocaleString()}</p>
+                    <p className="text-sm">退费后该学员将标记为已结课，利润将重新计算。</p>
+                  </div>
+                  <div className="flex gap-2 justify-end">
+                    <Button variant="outline" onClick={() => setRefundConfirm(false)}>
+                      返回
+                    </Button>
+                    <Button 
+                      variant="destructive"
+                      onClick={handleRefundSubmit}
+                    >
+                      确认退费
+                    </Button>
+                  </div>
+                </>
+              )}
             </CardContent>
           </Card>
         </div>

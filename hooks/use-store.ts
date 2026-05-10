@@ -226,6 +226,42 @@ export function useStore() {
     }))
   }, [])
 
+  // Refund course - 退费处理，重新计算利润
+  // 退费逻辑：
+  // 1. 记录退费金额
+  // 2. 重新计算该学员的sessionPrice = (totalFee - refundAmount) / completedSessions
+  // 3. 重新计算sessionIncome = 新sessionPrice - venueFee
+  // 4. 设置状态为ended
+  const refundCourse = useCallback((studentId: string, refundAmount: number) => {
+    setStudents(prev => prev.map(s => {
+      if (s.id !== studentId) return s
+      
+      // 获取已完成课时数
+      const completedCount = sessions.filter(
+        session => session.studentId === studentId && session.status === 'completed'
+      ).length
+      
+      // 重新计算：实际收费 = 总收费 - 退费金额
+      const actualFee = s.totalFee - refundAmount
+      // 新的单节课价 = 实际收费 / 已完成课时
+      const newSessionPrice = completedCount > 0 ? actualFee / completedCount : 0
+      // 新的单节利润 = 新单节价 - 场地费
+      const newSessionIncome = newSessionPrice - s.venueFee
+      
+      return {
+        ...s,
+        totalSessions: completedCount, // 将总课时设为已完成数
+        totalFee: actualFee, // 更新为实际收费
+        sessionPrice: newSessionPrice,
+        sessionIncome: newSessionIncome,
+        refundAmount: refundAmount,
+        refundAt: new Date().toISOString(),
+        status: 'ended' as const,
+        endedAt: new Date().toISOString(),
+      }
+    }))
+  }, [sessions])
+
   // Session operations
   const addSession = useCallback((session: Omit<Session, 'id' | 'createdAt'>) => {
     const newSession: Session = {
@@ -348,6 +384,7 @@ export function useStore() {
     endCourse,
     pauseCourse,
     restartCourse,
+    refundCourse,
     addSession,
     updateSession,
     deleteSession,

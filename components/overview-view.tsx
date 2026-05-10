@@ -18,12 +18,7 @@ interface OverviewViewProps {
   onTabChange?: (tab: string) => void
 }
 
-const sourceLabels: Record<string, string> = {
-  social_media: '社媒',
-  referral: '转介绍',
-  friend: '朋友',
-  other: '其他',
-}
+
 
 function getWeekRange(date: Date) {
   const day = date.getDay()
@@ -288,23 +283,6 @@ export function OverviewView({ students, sessions, getStudent, onSelectStudent, 
     }
   }, [students, sessions, getStudent])
 
-  // 学员来源统计
-  const sourceStats = useMemo(() => {
-    const stats: Record<string, number> = {
-      social_media: 0,
-      referral: 0,
-      friend: 0,
-      other: 0,
-    }
-    
-    students.forEach(s => {
-      const source = s.source || 'other'
-      stats[source] = (stats[source] || 0) + 1
-    })
-    
-    return stats
-  }, [students])
-
   // 学员进度 - 按消耗进度排序，过滤掉剩余0节、暂停和结课学员
   const studentProgress = useMemo(() => {
     const now = new Date()
@@ -546,37 +524,6 @@ export function OverviewView({ students, sessions, getStudent, onSelectStudent, 
           </CardContent>
         </Card>
       )}
-
-      {/* 学员来源统计 */}
-      <Card className="bg-card border-border">
-        <CardHeader>
-          <CardTitle className="text-sm font-medium">学员来源统计</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-border">
-                  <th className="text-left py-2 px-3 text-muted-foreground font-medium">来源</th>
-                  <th className="text-right py-2 px-3 text-muted-foreground font-medium">人数</th>
-                  <th className="text-right py-2 px-3 text-muted-foreground font-medium">占比</th>
-                </tr>
-              </thead>
-              <tbody>
-                {Object.entries(sourceStats).map(([source, count]) => (
-                  <tr key={source} className="border-b border-border hover:bg-muted/50">
-                    <td className="py-2 px-3 text-foreground">{sourceLabels[source]}</td>
-                    <td className="py-2 px-3 text-right font-medium">{count}</td>
-                    <td className="py-2 px-3 text-right text-muted-foreground">
-                      {students.length > 0 ? `${Math.round((count / students.length) * 100)}%` : '0%'}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </CardContent>
-      </Card>
 
       {/* 学员进度 */}
       <Card className="bg-card border-border">

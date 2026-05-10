@@ -60,7 +60,7 @@ export function RiskView({ students, sessions, getStudent, onRenewStudent, onSel
     })
   }, [students])
 
-  // 续课提醒（剩余课时 <= 4，排除已结课、已有续课计划的学员）
+  // 续课提醒（剩余课时 <= 4，排除已结课、暂停、已有续课计划的学员）
   const renewalReminders = useMemo(() => {
     return students.map(student => {
       const completed = sessions.filter(
@@ -73,6 +73,8 @@ export function RiskView({ students, sessions, getStudent, onRenewStudent, onSel
     }).filter(item => {
       // 排除已结课学员
       if (item.student.status === 'ended') return false
+      // 排除已暂停学员
+      if (item.student.status === 'paused') return false
       // 排除已有续课计划的学员
       if (item.hasPendingRenewal) return false
       // 只显示剩余课时 <= 4 的学员
