@@ -110,7 +110,7 @@ export function StudentsView({
     const needRenewal = remainingSessions <= 4 && remainingSessions >= 0
     
     // Get progress info with dynamic color
-    const progressInfo = getStudentProgress(student)
+    const progressInfo = getStudentProgress(student, sessions)
     
     // Pending (unconfirmed) renewals
     const pendingRenewals = (student.renewalHistory || []).filter(r => !r.confirmed)

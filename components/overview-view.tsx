@@ -300,7 +300,7 @@ export function OverviewView({ students, sessions, getStudent, onSelectStudent, 
       })
       .map(student => ({
         student,
-        progress: getStudentProgress(student),
+        progress: getStudentProgress(student, sessions),
       }))
       .filter(item => item.progress.remaining > 0) // 过滤掉剩余0节的学员
       .sort((a, b) => b.progress.percentage - a.progress.percentage)
