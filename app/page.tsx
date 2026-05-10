@@ -89,6 +89,7 @@ export default function CoachManagerPage() {
               sessions={store.sessions}
               getStudent={store.getStudent}
               onSelectStudent={setSelectedStudent}
+              onTabChange={setActiveTab}
             />
           )}
           
@@ -124,6 +125,7 @@ export default function CoachManagerPage() {
               getStudent={store.getStudent}
               onRenewStudent={setRenewingStudent}
               onSelectStudent={setSelectedStudent}
+              onEndCourse={store.endCourse}
             />
           )}
         </div>

@@ -2,8 +2,8 @@
 
 import { useMemo } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Progress } from '@/components/ui/progress'
 import { Button } from '@/components/ui/button'
+import { cn } from '@/lib/utils'
 import { Users, TrendingUp, Target, Clock } from 'lucide-react'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 import type { Student, Session } from '@/lib/types'
@@ -14,6 +14,7 @@ interface OverviewViewProps {
   sessions: Session[]
   getStudent: (id: string) => Student | undefined
   onSelectStudent?: (student: Student) => void
+  onTabChange?: (tab: string) => void
 }
 
 const sourceLabels: Record<string, string> = {
@@ -43,7 +44,7 @@ function getMonthRange(date: Date) {
   return { start, end }
 }
 
-export function OverviewView({ students, sessions, getStudent, onSelectStudent }: OverviewViewProps) {
+export function OverviewView({ students, sessions, getStudent, onSelectStudent, onTabChange }: OverviewViewProps) {
   // 本周数据
   const weekStats = useMemo(() => {
     const now = new Date()
@@ -293,17 +294,19 @@ export function OverviewView({ students, sessions, getStudent, onSelectStudent }
         </CardHeader>
         <CardContent>
           {weeklyProfitTrend.some(w => w.profit > 0) ? (
-            <ResponsiveContainer width="100%" height={200}>
-              <LineChart data={weeklyProfitTrend}>
+            <ResponsiveContainer width="100%" height={240}>
+              <LineChart data={weeklyProfitTrend} margin={{ top: 20, right: 30, left: 0, bottom: 5 }}>
                 <CartesianGrid stroke="hsl(var(--border))" vertical={false} strokeDasharray="3 3" />
                 <XAxis 
                   dataKey="name" 
                   stroke="hsl(var(--muted-foreground))"
-                  style={{ fontSize: '12px' }}
+                  style={{ fontSize: '11px' }}
+                  tickMargin={8}
                 />
                 <YAxis 
                   stroke="hsl(var(--muted-foreground))"
-                  style={{ fontSize: '12px' }}
+                  style={{ fontSize: '11px' }}
+                  tickFormatter={(value) => `¥${value}`}
                 />
                 <Tooltip 
                   contentStyle={{
@@ -318,13 +321,25 @@ export function OverviewView({ students, sessions, getStudent, onSelectStudent }
                   dataKey="profit"
                   stroke="hsl(var(--primary))"
                   strokeWidth={2}
-                  dot={{ fill: 'hsl(var(--primary))', r: 4 }}
-                  activeDot={{ r: 6 }}
+                  dot={{ fill: 'hsl(var(--primary))', r: 5, strokeWidth: 2, stroke: 'hsl(var(--background))' }}
+                  activeDot={{ r: 7, strokeWidth: 2 }}
+                  label={({ x, y, value }) => (
+                    <text
+                      x={x}
+                      y={y - 10}
+                      fill="hsl(var(--foreground))"
+                      textAnchor="middle"
+                      fontSize={10}
+                      fontWeight={500}
+                    >
+                      {value > 0 ? `¥${value}` : ''}
+                    </text>
+                  )}
                 />
               </LineChart>
             </ResponsiveContainer>
           ) : (
-            <div className="h-[200px] flex items-center justify-center text-muted-foreground">
+            <div className="h-[240px] flex items-center justify-center text-muted-foreground">
               暂无数据
             </div>
           )}
@@ -382,19 +397,22 @@ export function OverviewView({ students, sessions, getStudent, onSelectStudent }
       {/* 学员进度 */}
       <Card className="bg-card border-border">
         <CardHeader className="flex flex-row items-center justify-between">
-          <Button
-            variant="ghost"
-            className="text-sm font-medium text-muted-foreground hover:text-foreground cursor-pointer -ml-4"
-            asChild
+          <CardTitle 
+            className="text-sm font-medium cursor-pointer hover:text-primary transition-colors"
+            onClick={() => onTabChange?.('students')}
           >
-            <div>学员进度</div>
-          </Button>
+            学员进度
+          </CardTitle>
         </CardHeader>
         <CardContent>
           <div className="space-y-3">
             {studentProgress.length > 0 ? (
               studentProgress.map(({ student, progress }) => (
-                <div key={student.id} className="space-y-1">
+                <div 
+                  key={student.id} 
+                  className="space-y-1 cursor-pointer hover:bg-muted/50 p-2 -mx-2 rounded transition-colors"
+                  onClick={() => onSelectStudent?.(student)}
+                >
                   <div className="flex items-center justify-between">
                     <span className="text-sm font-medium text-foreground">{student.name}</span>
                     <span className="text-xs text-muted-foreground">
@@ -402,20 +420,26 @@ export function OverviewView({ students, sessions, getStudent, onSelectStudent }
                     </span>
                   </div>
                   <div className="flex items-center gap-2">
-                    <div className="flex-1">
-                      <Progress 
-                        value={progress.percentage}
-                        className={`h-2 bg-muted`}
-                        style={{
-                          '--progress-color': 
-                            progress.color === 'success' ? 'hsl(var(--success))' :
-                            progress.color === 'warning' ? 'hsl(var(--warning))' :
-                            'hsl(var(--destructive))'
-                        } as React.CSSProperties}
+                    <div className="flex-1 h-2 bg-muted rounded-full overflow-hidden">
+                      <div 
+                        className={
+                          progress.color === 'success' 
+                            ? "h-full transition-all rounded-full bg-success"
+                            : progress.color === 'warning'
+                            ? "h-full transition-all rounded-full bg-warning"
+                            : "h-full transition-all rounded-full bg-destructive"
+                        }
+                        style={{ width: `${Math.min(progress.percentage, 100)}%` }}
                       />
                     </div>
-                    <span className="text-xs text-muted-foreground min-w-8 text-right">
-                      {progress.remaining}
+                    <span className={
+                      progress.color === 'success'
+                        ? "text-xs min-w-8 text-right font-medium text-success"
+                        : progress.color === 'warning'
+                        ? "text-xs min-w-8 text-right font-medium text-warning"
+                        : "text-xs min-w-8 text-right font-medium text-destructive"
+                    }>
+                      剩{progress.remaining}
                     </span>
                   </div>
                 </div>
