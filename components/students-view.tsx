@@ -8,8 +8,9 @@ import { Progress } from '@/components/ui/progress'
 import { Checkbox } from '@/components/ui/checkbox'
 import { StudentForm } from './student-form'
 import { RenewalForm } from './renewal-form'
-import { Plus, Edit2, Trash2, User, RefreshCw, FileText, AlertCircle, LayoutGrid, List, CheckCircle } from 'lucide-react'
+import { Plus, Edit2, Trash2, User, RefreshCw, FileText, AlertCircle, LayoutGrid, List, CheckCircle, Star } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { getStudentProgress, formatProfit, calculateCompositeScore } from '@/lib/utils-helper'
 import type { Student, Session } from '@/lib/types'
 
 interface StudentsViewProps {
@@ -21,6 +22,7 @@ interface StudentsViewProps {
   onRenewStudent: (id: string, addedSessions: number, addedFee: number, addedVenueFee: number) => void
   onConfirmRenewal: (studentId: string, renewalId: string) => void
   onDeleteRenewal: (studentId: string, renewalId: string) => void
+  onSelectStudent?: (student: Student) => void
 }
 
 const courseTypeLabels: Record<string, string> = {
@@ -49,6 +51,7 @@ export function StudentsView({
   onRenewStudent,
   onConfirmRenewal,
   onDeleteRenewal,
+  onSelectStudent,
 }: StudentsViewProps) {
   const [isFormOpen, setIsFormOpen] = useState(false)
   const [isRenewalOpen, setIsRenewalOpen] = useState(false)
@@ -80,17 +83,33 @@ export function StudentsView({
     const completedSessions = studentSessions.filter(s => s.status === 'completed').length
     const remainingSessions = student.totalSessions - completedSessions
     const progress = student.totalSessions > 0 ? (completedSessions / student.totalSessions) * 100 : 0
-    // 单节利润 = 单节收入 - 场地费 (sessionIncome already = sessionPrice - venueFee)
     const sessionProfit = student.sessionIncome || (student.sessionPrice - student.venueFee)
     const profit = completedSessions * sessionProfit
     const showRenewal = remainingSessions <= 4 && remainingSessions >= 0
+    
+    // Get progress info with dynamic color
+    const progressInfo = getStudentProgress(student)
     
     // Pending (unconfirmed) renewals
     const pendingRenewals = (student.renewalHistory || []).filter(r => !r.confirmed)
     // Confirmed renewals
     const confirmedRenewals = (student.renewalHistory || []).filter(r => r.confirmed)
     
-    return { completedSessions, remainingSessions, progress, profit, showRenewal, sessionProfit, pendingRenewals, confirmedRenewals }
+    // Five-dimension rating
+    const compositeScore = calculateCompositeScore(student.ratings)
+    
+    return { 
+      completedSessions, 
+      remainingSessions, 
+      progress, 
+      profit, 
+      showRenewal, 
+      sessionProfit, 
+      pendingRenewals, 
+      confirmedRenewals,
+      progressColor: progressInfo.color,
+      compositeScore,
+    }
   }
 
   return (
@@ -145,8 +164,9 @@ export function StudentsView({
                     <th className="px-3 py-2 text-center text-xs font-medium text-muted-foreground">类型</th>
                     <th className="px-3 py-2 text-center text-xs font-medium text-muted-foreground">来源</th>
                     <th className="px-3 py-2 text-center text-xs font-medium text-muted-foreground">课时</th>
-                    <th className="px-3 py-2 text-right text-xs font-medium text-muted-foreground">单节利润</th>
-                    <th className="px-3 py-2 text-right text-xs font-medium text-muted-foreground">累计利润</th>
+                    <th className="px-3 py-2 text-center text-xs font-medium text-muted-foreground">进度</th>
+                    <th className="px-3 py-2 text-center text-xs font-medium text-muted-foreground">评分</th>
+                    <th className="px-3 py-2 text-right text-xs font-medium text-muted-foreground">利润</th>
                     <th className="px-3 py-2 text-center text-xs font-medium text-muted-foreground">操作</th>
                   </tr>
                 </thead>
@@ -156,10 +176,13 @@ export function StudentsView({
                     const courseType = student.courseType || 'offline'
                     return (
                       <Fragment key={student.id}>
-                        <tr className={cn(
-                          "border-b border-border last:border-b-0 hover:bg-muted/30",
-                          stats.showRenewal && "bg-warning/5"
-                        )}>
+                        <tr 
+                          className={cn(
+                            "border-b border-border last:border-b-0 hover:bg-muted/30 cursor-pointer transition-colors",
+                            stats.showRenewal && "bg-warning/5"
+                          )}
+                          onClick={() => onSelectStudent?.(student)}
+                        >
                           <td className="px-3 py-2">
                             <div className="flex items-center gap-2">
                               {stats.showRenewal && (
@@ -179,14 +202,35 @@ export function StudentsView({
                           <td className="px-3 py-2 text-center">
                             <span className="text-xs text-foreground">{stats.completedSessions}/{student.totalSessions}</span>
                           </td>
-                          <td className="px-3 py-2 text-right">
-                            <span className="text-xs text-foreground">¥{stats.sessionProfit.toFixed(0)}</span>
+                          <td className="px-3 py-2 text-center">
+                            <div className="flex items-center gap-1 justify-center">
+                              <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden">
+                                <div 
+                                  className={cn(
+                                    "h-full transition-all",
+                                    stats.progressColor === 'success' && "bg-success",
+                                    stats.progressColor === 'warning' && "bg-warning",
+                                    stats.progressColor === 'destructive' && "bg-destructive"
+                                  )}
+                                  style={{ width: `${Math.min(stats.progress, 100)}%` }}
+                                />
+                              </div>
+                              <span className="text-xs text-muted-foreground min-w-5 text-right">{stats.remainingSessions}</span>
+                            </div>
+                          </td>
+                          <td className="px-3 py-2 text-center">
+                            {stats.compositeScore > 0 && (
+                              <div className="flex items-center justify-center gap-1">
+                                <span className="text-xs font-medium">{stats.compositeScore.toFixed(1)}</span>
+                                <Star className="w-3 h-3 fill-yellow-400 text-yellow-400" />
+                              </div>
+                            )}
                           </td>
                           <td className="px-3 py-2 text-right">
-                            <span className="text-xs font-medium text-success">¥{stats.profit.toLocaleString()}</span>
+                            <span className="text-xs font-medium">¥{formatProfit(stats.profit)}</span>
                           </td>
                           <td className="px-3 py-2">
-                            <div className="flex items-center justify-center gap-1">
+                            <div className="flex items-center justify-center gap-1" onClick={e => e.stopPropagation()}>
                               <Button 
                                 variant="ghost" 
                                 size="icon"
@@ -219,7 +263,7 @@ export function StudentsView({
                         {/* Confirmed renewal records */}
                         {stats.confirmedRenewals.map(renewal => (
                           <tr key={renewal.id} className="border-b border-border bg-success/5">
-                            <td colSpan={7} className="px-3 py-1.5">
+                            <td colSpan={8} className="px-3 py-1.5">
                               <div className="flex items-center justify-between">
                                 <div className="flex items-center gap-2">
                                   <CheckCircle className="w-3 h-3 text-success flex-shrink-0" />
@@ -247,7 +291,7 @@ export function StudentsView({
                         {/* Pending renewal confirmations */}
                         {stats.pendingRenewals.map(renewal => (
                           <tr key={renewal.id} className="border-b border-border bg-warning/5">
-                            <td colSpan={7} className="px-3 py-1.5">
+                            <td colSpan={8} className="px-3 py-1.5">
                               <div className="flex items-center justify-between">
                                 <div className="flex items-center gap-2">
                                   <Checkbox
