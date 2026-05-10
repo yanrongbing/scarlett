@@ -76,7 +76,7 @@ export function PdfExportTab({ student, sessions, sessionRecords }: PdfExportTab
       <html>
       <head>
         <meta charset="UTF-8">
-        <title>${student.name} - 训练报告</title>
+        <title>姜贝果教练学员训练方案-${student.name}</title>
         <style>
           * { margin: 0; padding: 0; box-sizing: border-box; }
           body { 
@@ -125,7 +125,7 @@ export function PdfExportTab({ student, sessions, sessionRecords }: PdfExportTab
         </style>
       </head>
       <body>
-        <h1>${student.name} - 训练报告</h1>
+        <h1>姜贝果教练学员训练方案-${student.name}</h1>
     `
 
     // 基本信息

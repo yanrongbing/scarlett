@@ -90,6 +90,10 @@ export default function CoachManagerPage() {
               onRefundCourse={(studentId, refundAmount) => {
                 store.refundCourse(studentId, refundAmount)
               }}
+              onDeleteStudent={(studentId) => {
+                store.deleteStudent(studentId)
+                setSelectedStudent(null)
+              }}
             />
           </div>
         </main>
