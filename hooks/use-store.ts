@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import type { Student, Session, RenewalRecord } from '@/lib/types'
+import type { Student, Session, RenewalRecord, RatingDimensions } from '@/lib/types'
 
 const STUDENTS_KEY = 'coach-students'
 const SESSIONS_KEY = 'coach-sessions'
@@ -154,6 +154,19 @@ export function useStore() {
     }))
   }, [])
 
+  // Update student ratings
+  const updateStudentRatings = useCallback((studentId: string, ratings: RatingDimensions) => {
+    setStudents(prev => prev.map(s =>
+      s.id === studentId
+        ? {
+            ...s,
+            ratings,
+            ratings_updated_at: new Date().toISOString(),
+          }
+        : s
+    ))
+  }, [])
+
   // Session operations
   const addSession = useCallback((session: Omit<Session, 'id' | 'createdAt'>) => {
     const newSession: Session = {
@@ -259,6 +272,7 @@ export function useStore() {
     renewStudent,
     confirmRenewal,
     deleteRenewal,
+    updateStudentRatings,
     addSession,
     updateSession,
     deleteSession,
