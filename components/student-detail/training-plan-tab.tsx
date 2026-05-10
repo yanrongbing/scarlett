@@ -325,10 +325,10 @@ function PhaseCard({
   onUpdate: (updates: Partial<TrainingPhase>) => void
   onDelete: () => void
 }) {
-  const [name, setName] = useState(phase.name)
-  const [duration, setDuration] = useState(phase.duration)
-  const [sessionCount, setSessionCount] = useState(phase.sessionCount.toString())
-  const [dietSuggestions, setDietSuggestions] = useState(phase.dietSuggestions)
+  const [name, setName] = useState(phase.name || '')
+  const [duration, setDuration] = useState(phase.duration || '')
+  const [sessionCount, setSessionCount] = useState((phase.sessionCount || 0).toString())
+  const [dietSuggestions, setDietSuggestions] = useState(phase.dietSuggestions || '')
   const [newProject, setNewProject] = useState(false)
   const [newProjectName, setNewProjectName] = useState('')
   const [newProjectDesc, setNewProjectDesc] = useState('')
@@ -351,7 +351,7 @@ function PhaseCard({
       description: newProjectDesc,
     }
     onUpdate({
-      trainingProjects: [...phase.trainingProjects, project],
+      trainingProjects: [...(phase.trainingProjects || []), project],
     })
     setNewProjectName('')
     setNewProjectDesc('')
@@ -406,7 +406,7 @@ function PhaseCard({
               )}
             </div>
             <div className="space-y-2">
-              {phase.trainingProjects.map((proj) => (
+              {(phase.trainingProjects || []).map((proj) => (
                 <div key={proj.id} className="p-3 bg-muted rounded flex justify-between items-start">
                   <div className="flex-1">
                     <p className="font-medium text-sm">{proj.name}</p>
@@ -479,10 +479,10 @@ function PhaseCard({
       <CardContent className="pt-6">
         <div className="flex items-start justify-between mb-4">
           <div>
-            <h4 className="font-medium">{phase.name}</h4>
+            <h4 className="font-medium">{phase.name || '未命名阶段'}</h4>
             <div className="flex gap-3 mt-2 text-sm text-muted-foreground">
-              <span>时长: {phase.duration}</span>
-              <span>节数: {phase.sessionCount}</span>
+              <span>时长: {phase.duration || '-'}</span>
+              <span>节数: {phase.sessionCount || 0}</span>
             </div>
           </div>
           <div className="flex gap-2">
@@ -503,10 +503,10 @@ function PhaseCard({
           </div>
         </div>
 
-        {phase.trainingProjects.length > 0 && (
+        {(phase.trainingProjects || []).length > 0 && (
           <div className="mt-3 pt-3 border-t text-sm space-y-2">
             <p className="font-medium text-xs text-muted-foreground">训练项目:</p>
-            {phase.trainingProjects.map((proj) => (
+            {(phase.trainingProjects || []).map((proj) => (
               <div key={proj.id}>
                 <p className="font-medium">{proj.name}</p>
                 <p className="text-xs text-muted-foreground">{proj.description}</p>
