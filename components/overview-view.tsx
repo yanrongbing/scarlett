@@ -422,21 +422,23 @@ export function OverviewView({ students, sessions, getStudent, onSelectStudent, 
                   <div className="flex items-center gap-2">
                     <div className="flex-1 h-2 bg-muted rounded-full overflow-hidden">
                       <div 
-                        className={cn(
-                          "h-full transition-all rounded-full",
-                          progress.color === 'success' && "bg-success",
-                          progress.color === 'warning' && "bg-warning",
-                          progress.color === 'destructive' && "bg-destructive"
-                        )}
+                        className={
+                          progress.color === 'success' 
+                            ? "h-full transition-all rounded-full bg-success"
+                            : progress.color === 'warning'
+                            ? "h-full transition-all rounded-full bg-warning"
+                            : "h-full transition-all rounded-full bg-destructive"
+                        }
                         style={{ width: `${Math.min(progress.percentage, 100)}%` }}
                       />
                     </div>
-                    <span className={cn(
-                      "text-xs min-w-8 text-right font-medium",
-                      progress.color === 'success' && "text-success",
-                      progress.color === 'warning' && "text-warning",
-                      progress.color === 'destructive' && "text-destructive"
-                    )}>
+                    <span className={
+                      progress.color === 'success'
+                        ? "text-xs min-w-8 text-right font-medium text-success"
+                        : progress.color === 'warning'
+                        ? "text-xs min-w-8 text-right font-medium text-warning"
+                        : "text-xs min-w-8 text-right font-medium text-destructive"
+                    }>
                       剩{progress.remaining}
                     </span>
                   </div>
