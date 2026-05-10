@@ -1,8 +1,9 @@
 'use client'
 
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { cn } from '@/lib/utils'
 import { Users, TrendingUp, Target, Clock } from 'lucide-react'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
@@ -17,12 +18,7 @@ interface OverviewViewProps {
   onTabChange?: (tab: string) => void
 }
 
-const sourceLabels: Record<string, string> = {
-  social_media: '社媒',
-  referral: '转介绍',
-  friend: '朋友',
-  other: '其他',
-}
+
 
 function getWeekRange(date: Date) {
   const day = date.getDay()
@@ -44,7 +40,11 @@ function getMonthRange(date: Date) {
   return { start, end }
 }
 
+type TrendMode = 'weekly' | 'monthly' | 'yearly'
+
 export function OverviewView({ students, sessions, getStudent, onSelectStudent, onTabChange }: OverviewViewProps) {
+  const [trendMode, setTrendMode] = useState<TrendMode>('weekly')
+
   // 全局汇总数据
   const globalStats = useMemo(() => {
     // 总计学员数（排除已结课）
@@ -174,6 +174,75 @@ export function OverviewView({ students, sessions, getStudent, onSelectStudent, 
     return data
   }, [sessions, getStudent])
 
+  // 每月利润趋势 - 最近12个月
+  const monthlyProfitTrend = useMemo(() => {
+    const data = []
+    const today = new Date()
+
+    for (let i = 11; i >= 0; i--) {
+      const d = new Date(today.getFullYear(), today.getMonth() - i, 1)
+      const start = new Date(d.getFullYear(), d.getMonth(), 1)
+      const end = new Date(d.getFullYear(), d.getMonth() + 1, 0, 23, 59, 59, 999)
+      const startStr = start.toISOString().split('T')[0]
+      const endStr = end.toISOString().split('T')[0]
+
+      const monthSessions = sessions.filter(s => s.date >= startStr && s.date <= endStr && s.status === 'completed')
+
+      let profit = 0
+      monthSessions.forEach(session => {
+        const student = getStudent(session.studentId)
+        if (student) {
+          profit += student.sessionIncome || (student.sessionPrice - student.venueFee)
+        }
+      })
+
+      const monthLabel = i === 0 ? '本月' : `${d.getMonth() + 1}月`
+
+      data.push({ name: monthLabel, profit: Math.round(profit) })
+    }
+
+    return data
+  }, [sessions, getStudent])
+
+  // 每年利润趋势 - 最近5年
+  const yearlyProfitTrend = useMemo(() => {
+    const data = []
+    const today = new Date()
+
+    for (let i = 4; i >= 0; i--) {
+      const year = today.getFullYear() - i
+      const startStr = `${year}-01-01`
+      const endStr = `${year}-12-31`
+
+      const yearSessions = sessions.filter(s => s.date >= startStr && s.date <= endStr && s.status === 'completed')
+
+      let profit = 0
+      yearSessions.forEach(session => {
+        const student = getStudent(session.studentId)
+        if (student) {
+          profit += student.sessionIncome || (student.sessionPrice - student.venueFee)
+        }
+      })
+
+      data.push({ name: `${year}年`, profit: Math.round(profit) })
+    }
+
+    return data
+  }, [sessions, getStudent])
+
+  // 当前趋势数据
+  const currentTrendData = trendMode === 'weekly'
+    ? weeklyProfitTrend
+    : trendMode === 'monthly'
+    ? monthlyProfitTrend
+    : yearlyProfitTrend
+
+  const trendLabels: Record<TrendMode, string> = {
+    weekly: '每周利润趋势',
+    monthly: '每月利润趋势',
+    yearly: '每年利润趋势',
+  }
+
   // 未来30天收入预期
   const futureIncomeProjection = useMemo(() => {
     const confirmedIncome = {
@@ -213,23 +282,6 @@ export function OverviewView({ students, sessions, getStudent, onSelectStudent, 
       pending: Math.round(pendingIncome.amount),
     }
   }, [students, sessions, getStudent])
-
-  // 学员来源统计
-  const sourceStats = useMemo(() => {
-    const stats: Record<string, number> = {
-      social_media: 0,
-      referral: 0,
-      friend: 0,
-      other: 0,
-    }
-    
-    students.forEach(s => {
-      const source = s.source || 'other'
-      stats[source] = (stats[source] || 0) + 1
-    })
-    
-    return stats
-  }, [students])
 
   // 学员进度 - 按消耗进度排序，过滤掉剩余0节、暂停和结课学员
   const studentProgress = useMemo(() => {
@@ -388,15 +440,25 @@ export function OverviewView({ students, sessions, getStudent, onSelectStudent, 
         </Card>
       </div>
 
-      {/* 每周利润趋势图 */}
+      {/* 利润趋势图 */}
       <Card className="bg-card border-border">
-        <CardHeader>
-          <CardTitle className="text-sm font-medium">每周利润趋势</CardTitle>
+        <CardHeader className="flex flex-row items-center justify-between pb-2">
+          <CardTitle className="text-sm font-medium">利润趋势</CardTitle>
+          <Select value={trendMode} onValueChange={(v) => setTrendMode(v as TrendMode)}>
+            <SelectTrigger className="h-8 w-36 text-xs">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="weekly">每周利润趋势</SelectItem>
+              <SelectItem value="monthly">每月利润趋势</SelectItem>
+              <SelectItem value="yearly">每年利润趋势</SelectItem>
+            </SelectContent>
+          </Select>
         </CardHeader>
         <CardContent>
-          {weeklyProfitTrend.some(w => w.profit > 0) ? (
+          {currentTrendData.some(w => w.profit > 0) ? (
             <ResponsiveContainer width="100%" height={240}>
-              <LineChart data={weeklyProfitTrend} margin={{ top: 20, right: 30, left: 0, bottom: 5 }}>
+              <LineChart data={currentTrendData} margin={{ top: 20, right: 30, left: 0, bottom: 5 }}>
                 <CartesianGrid stroke="hsl(var(--border))" vertical={false} strokeDasharray="3 3" />
                 <XAxis 
                   dataKey="name" 
@@ -441,8 +503,8 @@ export function OverviewView({ students, sessions, getStudent, onSelectStudent, 
               </LineChart>
             </ResponsiveContainer>
           ) : (
-            <div className="h-[240px] flex items-center justify-center text-muted-foreground">
-              暂无数据
+            <div className="h-[240px] flex items-center justify-center text-muted-foreground text-sm">
+              暂无{trendLabels[trendMode]}数据
             </div>
           )}
         </CardContent>
@@ -462,37 +524,6 @@ export function OverviewView({ students, sessions, getStudent, onSelectStudent, 
           </CardContent>
         </Card>
       )}
-
-      {/* 学员来源统计 */}
-      <Card className="bg-card border-border">
-        <CardHeader>
-          <CardTitle className="text-sm font-medium">学员来源统计</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-border">
-                  <th className="text-left py-2 px-3 text-muted-foreground font-medium">来源</th>
-                  <th className="text-right py-2 px-3 text-muted-foreground font-medium">人数</th>
-                  <th className="text-right py-2 px-3 text-muted-foreground font-medium">占比</th>
-                </tr>
-              </thead>
-              <tbody>
-                {Object.entries(sourceStats).map(([source, count]) => (
-                  <tr key={source} className="border-b border-border hover:bg-muted/50">
-                    <td className="py-2 px-3 text-foreground">{sourceLabels[source]}</td>
-                    <td className="py-2 px-3 text-right font-medium">{count}</td>
-                    <td className="py-2 px-3 text-right text-muted-foreground">
-                      {students.length > 0 ? `${Math.round((count / students.length) * 100)}%` : '0%'}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </CardContent>
-      </Card>
 
       {/* 学员进度 */}
       <Card className="bg-card border-border">

@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
-import { Star, ArrowLeft, Upload, FileText, Eye, X } from 'lucide-react'
+import { Star, ArrowLeft, Upload, FileText, Eye, X, RefreshCw, Pause, CheckCircle, DollarSign, XCircle } from 'lucide-react'
 import { Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, ResponsiveContainer } from 'recharts'
 import type { Student, RatingDimensions } from '@/lib/types'
 import { getStudentProgress, calculateCompositeScore, formatProfit } from '@/lib/utils-helper'
@@ -18,6 +18,10 @@ interface StudentDetailProps {
   onEdit: () => void
   onUpdateRatings: (ratings: RatingDimensions) => void
   onUpdateStudent?: (updates: Partial<Student>) => void
+  onRenewStudent?: (student: Student) => void
+  onPauseCourse?: (studentId: string) => void
+  onEndCourse?: (studentId: string) => void
+  onRefundCourse?: (studentId: string, refundAmount: number) => void
 }
 
 export function StudentDetail({
@@ -27,6 +31,10 @@ export function StudentDetail({
   onEdit,
   onUpdateRatings,
   onUpdateStudent,
+  onRenewStudent,
+  onPauseCourse,
+  onEndCourse,
+  onRefundCourse,
 }: StudentDetailProps) {
   const [isEditingRatings, setIsEditingRatings] = useState(false)
   const [ratings, setRatings] = useState<RatingDimensions>(
@@ -39,6 +47,9 @@ export function StudentDetail({
     }
   )
   const [previewPdf, setPreviewPdf] = useState<string | null>(null)
+  const [showRefundDialog, setShowRefundDialog] = useState(false)
+  const [refundAmount, setRefundAmount] = useState('')
+  const [refundConfirm, setRefundConfirm] = useState(false)
   const trainingPlanInputRef = useRef<HTMLInputElement>(null)
   const contractInputRef = useRef<HTMLInputElement>(null)
 
@@ -92,6 +103,26 @@ export function StudentDetail({
     }
     reader.readAsDataURL(file)
   }
+
+  const handleRefundSubmit = () => {
+    if (!student || !onRefundCourse) return
+    const amount = parseFloat(refundAmount)
+    if (isNaN(amount) || amount <= 0) return
+    
+    if (!refundConfirm) {
+      setRefundConfirm(true)
+      return
+    }
+    
+    onRefundCourse(student.id, amount)
+    setShowRefundDialog(false)
+    setRefundAmount('')
+    setRefundConfirm(false)
+    onBack()
+  }
+
+  // 检查是否需要续课提醒
+  const needRenewal = progress.remaining <= 4 && progress.remaining >= 0
 
   return (
     <div className="max-w-4xl mx-auto">
@@ -430,6 +461,11 @@ export function StudentDetail({
           <CardContent className="py-4">
             <div className="flex items-center justify-center gap-2">
               <Badge variant="secondary" className="text-base px-4 py-1">已结课</Badge>
+              {student.refundAmount && (
+                <Badge variant="destructive" className="text-base px-4 py-1">
+                  退费 ¥{student.refundAmount.toLocaleString()}
+                </Badge>
+              )}
               {student.endedAt && (
                 <span className="text-sm text-muted-foreground">
                   结课时间: {new Date(student.endedAt).toLocaleDateString('zh-CN')}
@@ -438,6 +474,124 @@ export function StudentDetail({
             </div>
           </CardContent>
         </Card>
+      )}
+
+      {/* 操作按钮区域 - 仅在非结课状态显示 */}
+      {student.status !== 'ended' && (
+        <Card className="bg-card border-border mb-6">
+          <CardContent className="py-4">
+            <div className="flex flex-wrap justify-center gap-3">
+              <Button
+                size="lg"
+                className={needRenewal 
+                  ? "bg-success hover:bg-success/90 text-white animate-pulse" 
+                  : "bg-success hover:bg-success/90 text-white"
+                }
+                onClick={() => onRenewStudent?.(student)}
+              >
+                <RefreshCw className="w-4 h-4 mr-2" />
+                续课
+              </Button>
+              <Button
+                size="lg"
+                className="bg-blue hover:bg-blue/90 text-white"
+                onClick={() => onPauseCourse?.(student.id)}
+              >
+                <Pause className="w-4 h-4 mr-2" />
+                暂停
+              </Button>
+              <Button
+                size="lg"
+                className="bg-foreground hover:bg-foreground/90 text-background"
+                onClick={() => onEndCourse?.(student.id)}
+              >
+                <CheckCircle className="w-4 h-4 mr-2" />
+                结课
+              </Button>
+              <Button
+                size="lg"
+                className="bg-destructive hover:bg-destructive/90 text-white"
+                onClick={() => setShowRefundDialog(true)}
+              >
+                <DollarSign className="w-4 h-4 mr-2" />
+                退费
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* 退费弹窗 */}
+      {showRefundDialog && (
+        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
+          <Card className="w-full max-w-md">
+            <CardContent className="p-6 space-y-4">
+              <div className="flex items-center gap-2">
+                <XCircle className="w-5 h-5 text-destructive" />
+                <h3 className="text-lg font-semibold">退费 - {student.name}</h3>
+              </div>
+              
+              {!refundConfirm ? (
+                <>
+                  <div className="space-y-3">
+                    <div className="p-3 bg-muted/50 rounded-md text-sm space-y-1">
+                      <p>已完成课时：{completedCount} 节</p>
+                      <p>总收费：¥{student.totalFee.toLocaleString()}</p>
+                    </div>
+                    <div className="space-y-1">
+                      <Label>退费金额 (¥)</Label>
+                      <Input
+                        type="number"
+                        placeholder="输入退费金额"
+                        value={refundAmount}
+                        onChange={(e) => setRefundAmount(e.target.value)}
+                      />
+                    </div>
+                    {refundAmount && parseFloat(refundAmount) > 0 && (
+                      <div className="p-3 bg-warning/10 rounded-md text-sm text-warning">
+                        退费后实际收费：¥{(student.totalFee - parseFloat(refundAmount)).toLocaleString()}
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex gap-2 justify-end">
+                    <Button variant="outline" onClick={() => {
+                      setShowRefundDialog(false)
+                      setRefundAmount('')
+                    }}>
+                      取消
+                    </Button>
+                    <Button 
+                      variant="destructive"
+                      onClick={handleRefundSubmit}
+                      disabled={!refundAmount || parseFloat(refundAmount) <= 0}
+                    >
+                      下一步
+                    </Button>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="p-4 bg-destructive/10 rounded-md space-y-2">
+                    <p className="text-sm font-medium text-destructive">确认退费信息</p>
+                    <p className="text-sm">退费金额：¥{parseFloat(refundAmount).toLocaleString()}</p>
+                    <p className="text-sm">退费后该学员将标记为已结课，利润将重新计算。</p>
+                  </div>
+                  <div className="flex gap-2 justify-end">
+                    <Button variant="outline" onClick={() => setRefundConfirm(false)}>
+                      返回
+                    </Button>
+                    <Button 
+                      variant="destructive"
+                      onClick={handleRefundSubmit}
+                    >
+                      确认退费
+                    </Button>
+                  </div>
+                </>
+              )}
+            </CardContent>
+          </Card>
+        </div>
       )}
 
       {/* PDF预览弹窗 */}

@@ -43,6 +43,8 @@ export interface Student {
   status?: StudentStatus // 学员状态: active/paused/ended
   pausedAt?: string // 暂停时间
   endedAt?: string // 结课时间
+  refundAmount?: number // 退费金额
+  refundAt?: string // 退费时间
 }
 
 export type SessionStatus = 'planned' | 'completed'

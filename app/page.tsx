@@ -72,6 +72,20 @@ export default function CoachManagerPage() {
                 // 更新选中的学员对象以保持同步
                 setSelectedStudent(prev => prev ? { ...prev, ...updates } : null)
               }}
+              onRenewStudent={(student) => {
+                setRenewingStudent(student)
+              }}
+              onPauseCourse={(studentId) => {
+                store.pauseCourse(studentId)
+                setSelectedStudent(null)
+              }}
+              onEndCourse={(studentId) => {
+                store.endCourse(studentId)
+                setSelectedStudent(null)
+              }}
+              onRefundCourse={(studentId, refundAmount) => {
+                store.refundCourse(studentId, refundAmount)
+              }}
             />
           </div>
         </main>
@@ -113,6 +127,9 @@ export default function CoachManagerPage() {
               onDeleteRenewal={store.deleteRenewal}
               onSelectStudent={setSelectedStudent}
               onRestartCourse={store.restartCourse}
+              onEndCourse={store.endCourse}
+              onPauseCourse={store.pauseCourse}
+              onRefundCourse={store.refundCourse}
             />
           )}
           
