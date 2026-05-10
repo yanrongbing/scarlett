@@ -20,6 +20,14 @@ interface OverviewViewProps {
 
 
 
+// 使用本地时间格式化日期，避免时区问题
+function formatLocalDate(date: Date) {
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
 function getWeekRange(date: Date) {
   const day = date.getDay()
   const diff = date.getDate() - day + (day === 0 ? -6 : 1)
@@ -82,8 +90,8 @@ export function OverviewView({ students, sessions, getStudent, onSelectStudent, 
   const weekStats = useMemo(() => {
     const now = new Date()
     const { start, end } = getWeekRange(now)
-    const startStr = start.toISOString().split('T')[0]
-    const endStr = end.toISOString().split('T')[0]
+    const startStr = formatLocalDate(start)
+    const endStr = formatLocalDate(end)
     
     const weekSessions = sessions.filter(s => s.date >= startStr && s.date <= endStr)
     const completedSessions = weekSessions.filter(s => s.status === 'completed')
@@ -114,8 +122,8 @@ export function OverviewView({ students, sessions, getStudent, onSelectStudent, 
   const monthStats = useMemo(() => {
     const now = new Date()
     const { start, end } = getMonthRange(now)
-    const startStr = start.toISOString().split('T')[0]
-    const endStr = end.toISOString().split('T')[0]
+    const startStr = formatLocalDate(start)
+    const endStr = formatLocalDate(end)
     
     const monthSessions = sessions.filter(s => s.date >= startStr && s.date <= endStr)
     const completedSessions = monthSessions.filter(s => s.status === 'completed')
@@ -149,8 +157,8 @@ export function OverviewView({ students, sessions, getStudent, onSelectStudent, 
       const weekDate = new Date(today)
       weekDate.setDate(weekDate.getDate() - i * 7)
       const { start, end } = getWeekRange(weekDate)
-      const startStr = start.toISOString().split('T')[0]
-      const endStr = end.toISOString().split('T')[0]
+      const startStr = formatLocalDate(start)
+      const endStr = formatLocalDate(end)
       
       const weekSessions = sessions.filter(s => s.date >= startStr && s.date <= endStr && s.status === 'completed')
       
@@ -183,8 +191,8 @@ export function OverviewView({ students, sessions, getStudent, onSelectStudent, 
       const d = new Date(today.getFullYear(), today.getMonth() - i, 1)
       const start = new Date(d.getFullYear(), d.getMonth(), 1)
       const end = new Date(d.getFullYear(), d.getMonth() + 1, 0, 23, 59, 59, 999)
-      const startStr = start.toISOString().split('T')[0]
-      const endStr = end.toISOString().split('T')[0]
+      const startStr = formatLocalDate(start)
+      const endStr = formatLocalDate(end)
 
       const monthSessions = sessions.filter(s => s.date >= startStr && s.date <= endStr && s.status === 'completed')
 
@@ -256,11 +264,11 @@ export function OverviewView({ students, sessions, getStudent, onSelectStudent, 
     
     const thirtyDaysLater = new Date()
     thirtyDaysLater.setDate(thirtyDaysLater.getDate() + 30)
-    const endStr = thirtyDaysLater.toISOString().split('T')[0]
-    const today = new Date().toISOString().split('T')[0]
+    const endStr = formatLocalDate(thirtyDaysLater)
+    const todayStr = formatLocalDate(new Date())
     
     // 已排课的确认收入
-    const futureSessions = sessions.filter(s => s.date >= today && s.date <= endStr)
+    const futureSessions = sessions.filter(s => s.date >= todayStr && s.date <= endStr)
     futureSessions.forEach(session => {
       const student = getStudent(session.studentId)
       if (student) {
