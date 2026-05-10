@@ -22,46 +22,53 @@ export interface RatingDimensions {
 
 export type StudentStatus = 'active' | 'paused' | 'ended'
 
-// 训练计划
-export interface TrainingPlan {
-  goal: string          // 当前训练目标
-  focus: string         // 当前训练重点
-  mainExercises: string // 主要训练动作/训练方向
-  precautions: string   // 注意事项
-  stagePlan: string     // 阶段计划说明
-  coachNotes: string    // 教练备注
+// 身体信息
+export interface BodyInfo {
+  age?: number
+  height?: number // cm
+  weight?: number // kg
+  bodyFatPercentage?: number // %
+  trainingGoal?: string
+  bodyPhotoUrl?: string
 }
 
-// 照片条目
-export interface PhotoEntry {
-  url: string
-  note?: string
-  uploadedAt: string
-}
-
-// 学员照片
-export interface StudentPhotos {
-  beforePhotos: PhotoEntry[]
-  afterPhotos: PhotoEntry[]
-  progressPhotos: PhotoEntry[]
-}
-
-// 单个训练动作记录
-export interface TrainingItem {
+// 训练项目（在阶段中）
+export interface TrainingProject {
   id: string
-  exerciseName: string
-  sets: string
-  repsWeightDuration: string
-  statusAssessment: string
+  name: string
+  description: string
 }
 
-// 训练效果
-export interface TrainingEffect {
-  beforePhotos: PhotoEntry[]
-  afterPhotos: PhotoEntry[]
-  trainingFocus: string
-  keyResults: string
+// 训练阶段
+export interface TrainingPhase {
+  id: string
+  name: string
+  duration: string // 例如 "4周"
+  sessionCount: number // 对应节数
+  trainingProjects: TrainingProject[]
+  dietSuggestions: string
+}
+
+// 新的训练计划结构
+export interface TrainingPlan {
+  bodyInfo: BodyInfo
+  overallStrategy: string // 整体训练策略（自由文本框）
+  phases: TrainingPhase[]
+}
+
+// 单次训练效果记录
+export interface TrainingEffectRecord {
+  id: string
+  date: string
+  lessonNumber: number
+  photoUrl: string
   summary: string
+  createdAt: string
+}
+
+// 训练效果集合
+export interface TrainingEffect {
+  records: TrainingEffectRecord[]
 }
 
 // 单节课训练记录

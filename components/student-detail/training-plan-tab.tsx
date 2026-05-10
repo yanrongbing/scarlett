@@ -5,306 +5,471 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Textarea } from '@/components/ui/textarea'
-import { Badge } from '@/components/ui/badge'
-import { Plus, X, GripVertical, Edit2, Check, Trash2 } from 'lucide-react'
-import type { Student, TrainingPlan, TrainingPhase, TrainingItem } from '@/lib/types'
+import { Plus, Trash2, Edit2, Save, X } from 'lucide-react'
+import type { Student, TrainingPlan, TrainingPhase, TrainingProject } from '@/lib/types'
 
 interface TrainingPlanTabProps {
   student: Student
-  onUpdateStudent: (updates: Partial<Student>) => void
-}
-
-const defaultPhase: TrainingPhase = {
-  id: '',
-  name: '',
-  sessionsRange: [1, 10],
-  items: [],
-}
-
-const defaultItem: TrainingItem = {
-  id: '',
-  name: '',
-  goal: '',
-  completed: false,
+  onUpdateStudent?: (updates: Partial<Student>) => void
 }
 
 export function TrainingPlanTab({ student, onUpdateStudent }: TrainingPlanTabProps) {
+  const [isEditingStrategy, setIsEditingStrategy] = useState(false)
   const [editingPhaseId, setEditingPhaseId] = useState<string | null>(null)
-  const [editingItemId, setEditingItemId] = useState<string | null>(null)
-  
-  // 确保 trainingPlan 和 phases 都有默认值
+  const [newPhase, setNewPhase] = useState(false)
+
   const rawPlan = student.trainingPlan || {}
   const trainingPlan: TrainingPlan = {
+    bodyInfo: rawPlan.bodyInfo || {},
+    overallStrategy: rawPlan.overallStrategy || '',
     phases: Array.isArray(rawPlan.phases) ? rawPlan.phases : [],
-    overallGoal: rawPlan.overallGoal || ''
   }
 
-  const updatePlan = (updates: Partial<TrainingPlan>) => {
+  const handleUpdatePlan = (updates: Partial<TrainingPlan>) => {
+    if (!onUpdateStudent) return
     onUpdateStudent({
-      trainingPlan: { ...trainingPlan, ...updates }
+      trainingPlan: { ...trainingPlan, ...updates },
     })
   }
 
-  const addPhase = () => {
-    const newPhase: TrainingPhase = {
-      ...defaultPhase,
-      id: crypto.randomUUID(),
-      name: `阶段 ${trainingPlan.phases.length + 1}`,
-      sessionsRange: [
-        trainingPlan.phases.length > 0 
-          ? (trainingPlan.phases[trainingPlan.phases.length - 1].sessionsRange[1] + 1) 
-          : 1,
-        trainingPlan.phases.length > 0 
-          ? (trainingPlan.phases[trainingPlan.phases.length - 1].sessionsRange[1] + 10) 
-          : 10,
-      ],
+  const handleAddPhase = () => {
+    const newPhaseObj: TrainingPhase = {
+      id: Date.now().toString(),
+      name: '新阶段',
+      duration: '',
+      sessionCount: 0,
+      trainingProjects: [],
+      dietSuggestions: '',
     }
-    updatePlan({ phases: [...trainingPlan.phases, newPhase] })
-    setEditingPhaseId(newPhase.id)
+    handleUpdatePlan({ phases: [...trainingPlan.phases, newPhaseObj] })
+    setNewPhase(false)
   }
 
-  const updatePhase = (phaseId: string, updates: Partial<TrainingPhase>) => {
-    updatePlan({
-      phases: trainingPlan.phases.map(p => 
-        p.id === phaseId ? { ...p, ...updates } : p
-      )
-    })
+  const handleUpdatePhase = (phaseId: string, updates: Partial<TrainingPhase>) => {
+    const updated = trainingPlan.phases.map(p =>
+      p.id === phaseId ? { ...p, ...updates } : p
+    )
+    handleUpdatePlan({ phases: updated })
   }
 
-  const deletePhase = (phaseId: string) => {
-    updatePlan({
-      phases: trainingPlan.phases.filter(p => p.id !== phaseId)
-    })
-  }
-
-  const addItem = (phaseId: string) => {
-    const newItem: TrainingItem = {
-      ...defaultItem,
-      id: crypto.randomUUID(),
-    }
-    updatePhase(phaseId, {
-      items: [...(trainingPlan.phases.find(p => p.id === phaseId)?.items || []), newItem]
-    })
-    setEditingItemId(newItem.id)
-  }
-
-  const updateItem = (phaseId: string, itemId: string, updates: Partial<TrainingItem>) => {
-    const phase = trainingPlan.phases.find(p => p.id === phaseId)
-    if (!phase) return
-    updatePhase(phaseId, {
-      items: phase.items.map(i => i.id === itemId ? { ...i, ...updates } : i)
-    })
-  }
-
-  const deleteItem = (phaseId: string, itemId: string) => {
-    const phase = trainingPlan.phases.find(p => p.id === phaseId)
-    if (!phase) return
-    updatePhase(phaseId, {
-      items: phase.items.filter(i => i.id !== itemId)
+  const handleDeletePhase = (phaseId: string) => {
+    handleUpdatePlan({
+      phases: trainingPlan.phases.filter(p => p.id !== phaseId),
     })
   }
 
   return (
     <div className="space-y-6">
-      {/* 整体训练目标 */}
+      {/* 身体信息部分 */}
       <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-base">整体训练目标</CardTitle>
+        <CardHeader>
+          <CardTitle className="text-base">身体信息</CardTitle>
         </CardHeader>
-        <CardContent>
-          <Textarea
-            placeholder="输入学员的整体训练目标..."
-            value={trainingPlan.overallGoal || ''}
-            onChange={(e) => updatePlan({ overallGoal: e.target.value })}
-            className="min-h-[80px]"
-          />
+        <CardContent className="space-y-4">
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <Label className="text-sm">年龄（岁）</Label>
+              <Input
+                type="number"
+                value={trainingPlan.bodyInfo.age || ''}
+                onChange={(e) =>
+                  handleUpdatePlan({
+                    bodyInfo: {
+                      ...trainingPlan.bodyInfo,
+                      age: e.target.value ? parseInt(e.target.value) : undefined,
+                    },
+                  })
+                }
+                placeholder="25"
+              />
+            </div>
+            <div>
+              <Label className="text-sm">身高（cm）</Label>
+              <Input
+                type="number"
+                value={trainingPlan.bodyInfo.height || ''}
+                onChange={(e) =>
+                  handleUpdatePlan({
+                    bodyInfo: {
+                      ...trainingPlan.bodyInfo,
+                      height: e.target.value ? parseInt(e.target.value) : undefined,
+                    },
+                  })
+                }
+                placeholder="180"
+              />
+            </div>
+            <div>
+              <Label className="text-sm">体重（kg）</Label>
+              <Input
+                type="number"
+                value={trainingPlan.bodyInfo.weight || ''}
+                onChange={(e) =>
+                  handleUpdatePlan({
+                    bodyInfo: {
+                      ...trainingPlan.bodyInfo,
+                      weight: e.target.value ? parseFloat(e.target.value) : undefined,
+                    },
+                  })
+                }
+                placeholder="75"
+              />
+            </div>
+            <div>
+              <Label className="text-sm">体脂率（%）</Label>
+              <Input
+                type="number"
+                value={trainingPlan.bodyInfo.bodyFatPercentage || ''}
+                onChange={(e) =>
+                  handleUpdatePlan({
+                    bodyInfo: {
+                      ...trainingPlan.bodyInfo,
+                      bodyFatPercentage: e.target.value ? parseFloat(e.target.value) : undefined,
+                    },
+                  })
+                }
+                placeholder="20"
+              />
+            </div>
+          </div>
+          <div>
+            <Label className="text-sm">训练目标</Label>
+            <Input
+              value={trainingPlan.bodyInfo.trainingGoal || ''}
+              onChange={(e) =>
+                handleUpdatePlan({
+                  bodyInfo: {
+                    ...trainingPlan.bodyInfo,
+                    trainingGoal: e.target.value,
+                  },
+                })
+              }
+              placeholder="例如：增肌、减脂、体能提升..."
+            />
+          </div>
+          <div>
+            <Label className="text-sm">体态照片URL</Label>
+            <Input
+              value={trainingPlan.bodyInfo.bodyPhotoUrl || ''}
+              onChange={(e) =>
+                handleUpdatePlan({
+                  bodyInfo: {
+                    ...trainingPlan.bodyInfo,
+                    bodyPhotoUrl: e.target.value,
+                  },
+                })
+              }
+              placeholder="输入照片链接"
+            />
+          </div>
         </CardContent>
       </Card>
 
-      {/* 训练阶段列表 */}
-      <div className="space-y-4">
-        <div className="flex items-center justify-between">
-          <h3 className="text-sm font-medium">训练阶段</h3>
-          <Button size="sm" variant="outline" onClick={addPhase}>
-            <Plus className="w-4 h-4 mr-1" />
-            添加阶段
-          </Button>
-        </div>
+      {/* 整体训练策略 */}
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between pb-3">
+          <CardTitle className="text-base">整体训练策略</CardTitle>
+          {!isEditingStrategy && (
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => setIsEditingStrategy(true)}
+            >
+              <Edit2 className="w-3 h-3 mr-1" />
+              编辑
+            </Button>
+          )}
+        </CardHeader>
+        <CardContent>
+          {isEditingStrategy ? (
+            <div className="space-y-3">
+              <textarea
+                value={trainingPlan.overallStrategy}
+                onChange={(e) => handleUpdatePlan({ overallStrategy: e.target.value })}
+                placeholder="输入整体训练策略..."
+                className="w-full h-32 p-3 border border-border rounded-lg resize-none"
+              />
+              <div className="flex gap-2 justify-end">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setIsEditingStrategy(false)}
+                >
+                  取消
+                </Button>
+                <Button
+                  size="sm"
+                  onClick={() => setIsEditingStrategy(false)}
+                >
+                  <Save className="w-3 h-3 mr-1" />
+                  保存
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <div className="p-3 bg-muted rounded-lg min-h-[120px]">
+              <p className="text-sm whitespace-pre-wrap">
+                {trainingPlan.overallStrategy || '暂无'}
+              </p>
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
-        {trainingPlan.phases.length === 0 ? (
-          <Card className="border-dashed">
-            <CardContent className="py-8 text-center text-muted-foreground">
-              <p>暂无训练阶段</p>
-              <p className="text-sm mt-1">点击上方按钮添加第一个训练阶段</p>
-            </CardContent>
-          </Card>
-        ) : (
-          trainingPlan.phases.map((phase, phaseIndex) => (
-            <Card key={phase.id} className="overflow-hidden">
-              <CardHeader className="pb-3 bg-muted/30">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <GripVertical className="w-4 h-4 text-muted-foreground cursor-move" />
-                    {editingPhaseId === phase.id ? (
-                      <Input
-                        value={phase.name}
-                        onChange={(e) => updatePhase(phase.id, { name: e.target.value })}
-                        className="h-8 w-40"
-                        autoFocus
-                      />
-                    ) : (
-                      <span className="font-medium">{phase.name}</span>
-                    )}
-                    <Badge variant="secondary" className="text-xs">
-                      第 {phase.sessionsRange[0]} - {phase.sessionsRange[1]} 节课
-                    </Badge>
+      {/* 训练阶段规划 */}
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between pb-3">
+          <CardTitle className="text-base">训练阶段规划</CardTitle>
+          {!newPhase && (
+            <Button
+              size="sm"
+              onClick={() => setNewPhase(true)}
+            >
+              <Plus className="w-3 h-3 mr-1" />
+              新增阶段
+            </Button>
+          )}
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {trainingPlan.phases.map((phase) => (
+            <PhaseCard
+              key={phase.id}
+              phase={phase}
+              isEditing={editingPhaseId === phase.id}
+              onEdit={() => setEditingPhaseId(phase.id)}
+              onUpdate={(updates) => handleUpdatePhase(phase.id, updates)}
+              onDelete={() => handleDeletePhase(phase.id)}
+            />
+          ))}
+
+          {newPhase && (
+            <div className="p-4 border-2 border-dashed border-border rounded-lg">
+              <Button
+                size="sm"
+                className="w-full"
+                onClick={handleAddPhase}
+              >
+                <Plus className="w-3 h-3 mr-1" />
+                确认新增
+              </Button>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  )
+}
+
+function PhaseCard({
+  phase,
+  isEditing,
+  onEdit,
+  onUpdate,
+  onDelete,
+}: {
+  phase: TrainingPhase
+  isEditing: boolean
+  onEdit: () => void
+  onUpdate: (updates: Partial<TrainingPhase>) => void
+  onDelete: () => void
+}) {
+  const [name, setName] = useState(phase.name)
+  const [duration, setDuration] = useState(phase.duration)
+  const [sessionCount, setSessionCount] = useState(phase.sessionCount.toString())
+  const [dietSuggestions, setDietSuggestions] = useState(phase.dietSuggestions)
+  const [newProject, setNewProject] = useState(false)
+  const [newProjectName, setNewProjectName] = useState('')
+  const [newProjectDesc, setNewProjectDesc] = useState('')
+
+  const handleSave = () => {
+    onUpdate({
+      name,
+      duration,
+      sessionCount: parseInt(sessionCount) || 0,
+      dietSuggestions,
+    })
+    onEdit()
+  }
+
+  const handleAddProject = () => {
+    if (!newProjectName.trim()) return
+    const project: TrainingProject = {
+      id: Date.now().toString(),
+      name: newProjectName,
+      description: newProjectDesc,
+    }
+    onUpdate({
+      trainingProjects: [...phase.trainingProjects, project],
+    })
+    setNewProjectName('')
+    setNewProjectDesc('')
+    setNewProject(false)
+  }
+
+  const handleDeleteProject = (projectId: string) => {
+    onUpdate({
+      trainingProjects: phase.trainingProjects.filter(p => p.id !== projectId),
+    })
+  }
+
+  if (isEditing) {
+    return (
+      <Card>
+        <CardContent className="pt-6 space-y-4">
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <Label className="text-sm">阶段名称</Label>
+              <Input
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+              />
+            </div>
+            <div>
+              <Label className="text-sm">时长</Label>
+              <Input
+                value={duration}
+                onChange={(e) => setDuration(e.target.value)}
+                placeholder="例如: 4周"
+              />
+            </div>
+            <div>
+              <Label className="text-sm">对应节数</Label>
+              <Input
+                type="number"
+                value={sessionCount}
+                onChange={(e) => setSessionCount(e.target.value)}
+              />
+            </div>
+          </div>
+
+          {/* 训练项目 */}
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <Label className="text-sm">训练项目</Label>
+              {!newProject && (
+                <Button size="sm" variant="outline" onClick={() => setNewProject(true)}>
+                  <Plus className="w-3 h-3 mr-1" />
+                  添加
+                </Button>
+              )}
+            </div>
+            <div className="space-y-2">
+              {phase.trainingProjects.map((proj) => (
+                <div key={proj.id} className="p-3 bg-muted rounded flex justify-between items-start">
+                  <div className="flex-1">
+                    <p className="font-medium text-sm">{proj.name}</p>
+                    <p className="text-xs text-muted-foreground">{proj.description}</p>
                   </div>
-                  <div className="flex items-center gap-1">
-                    {editingPhaseId === phase.id ? (
-                      <>
-                        <div className="flex items-center gap-1 mr-2">
-                          <Input
-                            type="number"
-                            value={phase.sessionsRange[0]}
-                            onChange={(e) => updatePhase(phase.id, { 
-                              sessionsRange: [parseInt(e.target.value) || 1, phase.sessionsRange[1]] 
-                            })}
-                            className="h-7 w-14 text-xs"
-                            min={1}
-                          />
-                          <span className="text-xs text-muted-foreground">-</span>
-                          <Input
-                            type="number"
-                            value={phase.sessionsRange[1]}
-                            onChange={(e) => updatePhase(phase.id, { 
-                              sessionsRange: [phase.sessionsRange[0], parseInt(e.target.value) || 10] 
-                            })}
-                            className="h-7 w-14 text-xs"
-                            min={phase.sessionsRange[0]}
-                          />
-                        </div>
-                        <Button 
-                          size="sm" 
-                          variant="ghost" 
-                          className="h-7 w-7 p-0"
-                          onClick={() => setEditingPhaseId(null)}
-                        >
-                          <Check className="w-4 h-4" />
-                        </Button>
-                      </>
-                    ) : (
-                      <Button 
-                        size="sm" 
-                        variant="ghost" 
-                        className="h-7 w-7 p-0"
-                        onClick={() => setEditingPhaseId(phase.id)}
-                      >
-                        <Edit2 className="w-4 h-4" />
-                      </Button>
-                    )}
-                    <Button 
-                      size="sm" 
-                      variant="ghost" 
-                      className="h-7 w-7 p-0 text-destructive hover:text-destructive"
-                      onClick={() => deletePhase(phase.id)}
-                    >
-                      <Trash2 className="w-4 h-4" />
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => handleDeleteProject(proj.id)}
+                  >
+                    <Trash2 className="w-3 h-3" />
+                  </Button>
+                </div>
+              ))}
+              {newProject && (
+                <div className="p-3 border border-dashed rounded space-y-2">
+                  <Input
+                    placeholder="项目名称"
+                    value={newProjectName}
+                    onChange={(e) => setNewProjectName(e.target.value)}
+                    className="text-sm"
+                  />
+                  <textarea
+                    placeholder="项目描述"
+                    value={newProjectDesc}
+                    onChange={(e) => setNewProjectDesc(e.target.value)}
+                    className="w-full h-16 p-2 border border-border rounded text-sm resize-none"
+                  />
+                  <div className="flex gap-2 justify-end">
+                    <Button size="sm" variant="outline" onClick={() => setNewProject(false)}>
+                      取消
+                    </Button>
+                    <Button size="sm" onClick={handleAddProject}>
+                      保存
                     </Button>
                   </div>
                 </div>
-              </CardHeader>
-              <CardContent className="pt-4">
-                {/* 训练项目列表 */}
-                <div className="space-y-2">
-                  {phase.items.map((item, itemIndex) => (
-                    <div 
-                      key={item.id} 
-                      className="flex items-start gap-3 p-3 rounded-lg bg-muted/30 group"
-                    >
-                      <div className="flex-1 space-y-2">
-                        {editingItemId === item.id ? (
-                          <>
-                            <Input
-                              placeholder="训练项目名称"
-                              value={item.name}
-                              onChange={(e) => updateItem(phase.id, item.id, { name: e.target.value })}
-                              className="h-8"
-                              autoFocus
-                            />
-                            <Input
-                              placeholder="训练目标 (可选)"
-                              value={item.goal || ''}
-                              onChange={(e) => updateItem(phase.id, item.id, { goal: e.target.value })}
-                              className="h-8"
-                            />
-                          </>
-                        ) : (
-                          <>
-                            <div className="flex items-center gap-2">
-                              <input
-                                type="checkbox"
-                                checked={item.completed}
-                                onChange={(e) => updateItem(phase.id, item.id, { completed: e.target.checked })}
-                                className="w-4 h-4 rounded"
-                              />
-                              <span className={item.completed ? 'line-through text-muted-foreground' : ''}>
-                                {item.name || '未命名项目'}
-                              </span>
-                            </div>
-                            {item.goal && (
-                              <p className="text-sm text-muted-foreground pl-6">{item.goal}</p>
-                            )}
-                          </>
-                        )}
-                      </div>
-                      <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                        {editingItemId === item.id ? (
-                          <Button 
-                            size="sm" 
-                            variant="ghost" 
-                            className="h-7 w-7 p-0"
-                            onClick={() => setEditingItemId(null)}
-                          >
-                            <Check className="w-4 h-4" />
-                          </Button>
-                        ) : (
-                          <Button 
-                            size="sm" 
-                            variant="ghost" 
-                            className="h-7 w-7 p-0"
-                            onClick={() => setEditingItemId(item.id)}
-                          >
-                            <Edit2 className="w-4 h-4" />
-                          </Button>
-                        )}
-                        <Button 
-                          size="sm" 
-                          variant="ghost" 
-                          className="h-7 w-7 p-0 text-destructive hover:text-destructive"
-                          onClick={() => deleteItem(phase.id, item.id)}
-                        >
-                          <X className="w-4 h-4" />
-                        </Button>
-                      </div>
-                    </div>
-                  ))}
-                  
-                  <Button 
-                    size="sm" 
-                    variant="ghost" 
-                    className="w-full border-dashed border mt-2"
-                    onClick={() => addItem(phase.id)}
-                  >
-                    <Plus className="w-4 h-4 mr-1" />
-                    添加训练项目
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          ))
+              )}
+            </div>
+          </div>
+
+          {/* 饮食建议 */}
+          <div>
+            <Label className="text-sm">饮食建议</Label>
+            <textarea
+              value={dietSuggestions}
+              onChange={(e) => setDietSuggestions(e.target.value)}
+              placeholder="输入饮食建议..."
+              className="w-full h-20 p-2 border border-border rounded-lg text-sm resize-none"
+            />
+          </div>
+
+          <div className="flex gap-2 justify-end">
+            <Button size="sm" variant="outline" onClick={() => onEdit()}>
+              <X className="w-3 h-3 mr-1" />
+              取消
+            </Button>
+            <Button size="sm" onClick={handleSave}>
+              <Save className="w-3 h-3 mr-1" />
+              保存
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+    )
+  }
+
+  return (
+    <Card>
+      <CardContent className="pt-6">
+        <div className="flex items-start justify-between mb-4">
+          <div>
+            <h4 className="font-medium">{phase.name}</h4>
+            <div className="flex gap-3 mt-2 text-sm text-muted-foreground">
+              <span>时长: {phase.duration}</span>
+              <span>节数: {phase.sessionCount}</span>
+            </div>
+          </div>
+          <div className="flex gap-2">
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => onEdit()}
+            >
+              <Edit2 className="w-3 h-3" />
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={onDelete}
+            >
+              <Trash2 className="w-3 h-3" />
+            </Button>
+          </div>
+        </div>
+
+        {phase.trainingProjects.length > 0 && (
+          <div className="mt-3 pt-3 border-t text-sm space-y-2">
+            <p className="font-medium text-xs text-muted-foreground">训练项目:</p>
+            {phase.trainingProjects.map((proj) => (
+              <div key={proj.id}>
+                <p className="font-medium">{proj.name}</p>
+                <p className="text-xs text-muted-foreground">{proj.description}</p>
+              </div>
+            ))}
+          </div>
         )}
-      </div>
-    </div>
+
+        {phase.dietSuggestions && (
+          <div className="mt-3 pt-3 border-t text-sm">
+            <p className="font-medium text-xs text-muted-foreground mb-1">饮食建议:</p>
+            <p className="text-xs">{phase.dietSuggestions}</p>
+          </div>
+        )}
+      </CardContent>
+    </Card>
   )
 }
