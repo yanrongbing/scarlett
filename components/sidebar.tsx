@@ -9,16 +9,26 @@ import {
   Upload,
   Bell,
   Menu,
-  X
+  X,
+  AlertTriangle
 } from 'lucide-react'
 import { useState } from 'react'
 import { Button } from '@/components/ui/button'
+import { Card, CardContent } from '@/components/ui/card'
 
 interface SidebarProps {
   activeTab: string
   onTabChange: (tab: string) => void
   onExport: () => void
   onImport: () => void
+}
+
+interface ImportPreview {
+  content: string
+  studentCount: number
+  sessionCount: number
+  renewalCount: number
+  ratingCount: number
 }
 
 const navItems = [
@@ -30,6 +40,46 @@ const navItems = [
 
 export function Sidebar({ activeTab, onTabChange, onExport, onImport }: SidebarProps) {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
+  const [importPreview, setImportPreview] = useState<ImportPreview | null>(null)
+
+  const handleFileSelect = (file: File) => {
+    const reader = new FileReader()
+    reader.onload = (event) => {
+      const content = event.target?.result as string
+      try {
+        const data = JSON.parse(content)
+        const studentCount = data.students?.length || 0
+        const sessionCount = data.sessions?.length || 0
+        let renewalCount = 0
+        let ratingCount = 0
+        
+        if (data.students) {
+          data.students.forEach((s: { renewalHistory?: unknown[]; ratings?: Record<string, unknown> }) => {
+            if (s.renewalHistory?.length) renewalCount += s.renewalHistory.length
+            if (s.ratings && Object.keys(s.ratings).length > 0) ratingCount++
+          })
+        }
+        
+        setImportPreview({ content, studentCount, sessionCount, renewalCount, ratingCount })
+      } catch {
+        alert('JSON 文件格式错误，请检查文件内容')
+      }
+    }
+    reader.readAsText(file)
+  }
+
+  const confirmImport = () => {
+    if (importPreview) {
+      onImport()
+      const importEvent = new CustomEvent('importData', { detail: importPreview.content })
+      window.dispatchEvent(importEvent)
+      setImportPreview(null)
+    }
+  }
+
+  const cancelImport = () => {
+    setImportPreview(null)
+  }
 
   const handleTabChange = (tab: string) => {
     onTabChange(tab)
@@ -93,16 +143,10 @@ export function Sidebar({ activeTab, onTabChange, onExport, onImport }: SidebarP
                   onChange={(e) => {
                     const file = e.target.files?.[0]
                     if (file) {
-                      const reader = new FileReader()
-                      reader.onload = (event) => {
-                        const content = event.target?.result as string
-                        onImport()
-                        const importEvent = new CustomEvent('importData', { detail: content })
-                        window.dispatchEvent(importEvent)
-                      }
-                      reader.readAsText(file)
+                      handleFileSelect(file)
                     }
                     setIsMobileMenuOpen(false)
+                    e.target.value = ''
                   }}
                 />
               </label>
@@ -157,20 +201,55 @@ export function Sidebar({ activeTab, onTabChange, onExport, onImport }: SidebarP
               onChange={(e) => {
                 const file = e.target.files?.[0]
                 if (file) {
-                  const reader = new FileReader()
-                  reader.onload = (event) => {
-                    const content = event.target?.result as string
-                    onImport()
-                    const importEvent = new CustomEvent('importData', { detail: content })
-                    window.dispatchEvent(importEvent)
-                  }
-                  reader.readAsText(file)
+                  handleFileSelect(file)
                 }
+                e.target.value = ''
               }}
             />
           </label>
         </div>
       </aside>
+
+      {/* 导入确认弹窗 */}
+      {importPreview && (
+        <div className="fixed inset-0 z-[100] bg-black/50 flex items-center justify-center p-4">
+          <Card className="w-full max-w-md">
+            <CardContent className="p-6 space-y-4">
+              <div className="flex items-center gap-3">
+                <AlertTriangle className="w-6 h-6 text-warning" />
+                <h3 className="text-lg font-semibold">确认导入数据</h3>
+              </div>
+              
+              <div className="p-4 bg-muted/50 rounded-lg space-y-2">
+                <p className="text-sm font-medium">即将导入：</p>
+                <ul className="text-sm text-muted-foreground space-y-1">
+                  <li>• <span className="font-medium text-foreground">{importPreview.studentCount}</span> 个学员</li>
+                  <li>• <span className="font-medium text-foreground">{importPreview.sessionCount}</span> 条课程记录</li>
+                  {importPreview.renewalCount > 0 && (
+                    <li>• <span className="font-medium text-foreground">{importPreview.renewalCount}</span> 条续费记录</li>
+                  )}
+                  {importPreview.ratingCount > 0 && (
+                    <li>• <span className="font-medium text-foreground">{importPreview.ratingCount}</span> 个学员评分</li>
+                  )}
+                </ul>
+              </div>
+
+              <p className="text-sm text-warning">
+                导入会覆盖当前本地数据，是否继续？
+              </p>
+
+              <div className="flex gap-3 justify-end">
+                <Button variant="outline" onClick={cancelImport}>
+                  取消
+                </Button>
+                <Button onClick={confirmImport}>
+                  确认导入
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
     </>
   )
 }

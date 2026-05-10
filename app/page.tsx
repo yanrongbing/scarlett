@@ -59,6 +59,7 @@ export default function CoachManagerPage() {
             <StudentDetail
               student={selectedStudent}
               sessions={store.sessions}
+              sessionRecords={store.getStudentSessionRecords(selectedStudent.id)}
               onBack={() => setSelectedStudent(null)}
               onEdit={() => {
                 setActiveTab('students')
@@ -71,6 +72,9 @@ export default function CoachManagerPage() {
                 store.updateStudent(selectedStudent.id, updates)
                 // 更新选中的学员对象以保持同步
                 setSelectedStudent(prev => prev ? { ...prev, ...updates } : null)
+              }}
+              onUpdateSessionRecord={(record) => {
+                store.updateSessionRecord(record)
               }}
               onRenewStudent={(student) => {
                 setRenewingStudent(student)

@@ -1,23 +1,30 @@
 'use client'
 
-import { useState, useRef } from 'react'
+import { useState, useRef, useMemo } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
-import { Star, ArrowLeft, Upload, FileText, Eye, X, RefreshCw, Pause, CheckCircle, DollarSign, XCircle } from 'lucide-react'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Star, ArrowLeft, Upload, FileText, Eye, X, RefreshCw, Pause, CheckCircle, DollarSign, XCircle, ClipboardList, BookOpen, TrendingUp, FileDown, User } from 'lucide-react'
 import { Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, ResponsiveContainer } from 'recharts'
-import type { Student, RatingDimensions } from '@/lib/types'
+import type { Student, Session, SessionRecord, RatingDimensions } from '@/lib/types'
 import { getStudentProgress, calculateCompositeScore, formatProfit } from '@/lib/utils-helper'
+import { TrainingPlanTab } from '@/components/student-detail/training-plan-tab'
+import { SessionRecordsTab } from '@/components/student-detail/session-records-tab'
+import { TrainingEffectTab } from '@/components/student-detail/training-effect-tab'
+import { PdfExportTab } from '@/components/student-detail/pdf-export-tab'
 
 interface StudentDetailProps {
   student: Student | null
-  sessions: { id: string; studentId: string; date: string; time: string; status: string }[]
+  sessions: Session[]
+  sessionRecords: SessionRecord[]
   onBack: () => void
   onEdit: () => void
   onUpdateRatings: (ratings: RatingDimensions) => void
   onUpdateStudent?: (updates: Partial<Student>) => void
+  onUpdateSessionRecord?: (record: SessionRecord) => void
   onRenewStudent?: (student: Student) => void
   onPauseCourse?: (studentId: string) => void
   onEndCourse?: (studentId: string) => void
@@ -27,15 +34,18 @@ interface StudentDetailProps {
 export function StudentDetail({
   student,
   sessions,
+  sessionRecords,
   onBack,
   onEdit,
   onUpdateRatings,
   onUpdateStudent,
+  onUpdateSessionRecord,
   onRenewStudent,
   onPauseCourse,
   onEndCourse,
   onRefundCourse,
 }: StudentDetailProps) {
+  const [activeTab, setActiveTab] = useState('info')
   const [isEditingRatings, setIsEditingRatings] = useState(false)
   const [ratings, setRatings] = useState<RatingDimensions>(
     student?.ratings || {
@@ -61,11 +71,11 @@ export function StudentDetail({
     )
   }
 
-  const progress = getStudentProgress(student)
+  const progress = getStudentProgress(student, sessions)
   const compositeScore = calculateCompositeScore(student.ratings)
   const studentSessions = sessions.filter(s => s.studentId === student.id)
   const completedCount = studentSessions.filter(s => s.status === 'completed').length
-  const plannedCount = studentSessions.filter(s => s.status === 'planned').length
+  const studentRecords = sessionRecords.filter(r => r.studentId === student.id)
 
   const radarData = [
     { name: '信任度', value: student.ratings?.trust || 0 },
@@ -76,14 +86,11 @@ export function StudentDetail({
   ]
 
   const handleRatingChange = (dimension: keyof RatingDimensions, value: number) => {
-    const newRatings = {
-      ...ratings,
-      [dimension]: Math.max(1, Math.min(5, value)),
-    }
+    const newRatings = { ...ratings, [dimension]: value }
     setRatings(newRatings)
   }
 
-  const handleSaveRatings = () => {
+  const handleRatingSave = () => {
     onUpdateRatings(ratings)
     setIsEditingRatings(false)
   }
@@ -121,405 +128,433 @@ export function StudentDetail({
     onBack()
   }
 
-  // 检查是否需要续课提醒
   const needRenewal = progress.remaining <= 4 && progress.remaining >= 0
 
   return (
-    <div className="max-w-4xl mx-auto">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-6">
-        <div className="flex items-center gap-3">
-          <Button variant="ghost" size="icon" onClick={onBack}>
-            <ArrowLeft className="w-4 h-4" />
-          </Button>
-          <h1 className="text-2xl font-bold text-foreground">{student.name}</h1>
-        </div>
-        <Button onClick={onEdit} variant="default" size="sm">
-          编辑
-        </Button>
-      </div>
-
-      {/* Basic Info Grid */}
-      <div className="grid gap-4 md:grid-cols-2 mb-6">
-        <Card className="bg-card border-border">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm text-muted-foreground">基础信息</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-2 text-sm">
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">课程类型:</span>
-              <span className="font-medium">{student.courseType === 'online' ? '线上' : '线下'}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">学员来源:</span>
-              <span className="font-medium">
-                {student.source === 'social_media' ? '社媒' : student.source === 'referral' ? '转介绍' : student.source === 'friend' ? '朋友' : '其他'}
-              </span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">加入时间:</span>
-              <span className="font-medium">{new Date(student.createdAt).toLocaleDateString('zh-CN')}</span>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="bg-card border-border">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm text-muted-foreground">课程购买信息</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-2 text-sm">
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">课程收费:</span>
-              <span className="font-medium">¥{Math.round(student.totalFee).toLocaleString('zh-CN')}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">总课时:</span>
-              <span className="font-medium">{student.totalSessions} 节</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">单节课费:</span>
-              <span className="font-medium">¥{Math.round(student.sessionPrice).toLocaleString('zh-CN')}</span>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Progress Info */}
-      <Card className="bg-card border-border mb-6">
-        <CardHeader className="pb-2">
-          <CardTitle className="text-sm text-muted-foreground">课时进度</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid gap-4 md:grid-cols-4 mb-4">
-            <div className="text-center">
-              <p className="text-2xl font-bold text-foreground">{progress.completed}</p>
-              <p className="text-xs text-muted-foreground">已上课时</p>
-            </div>
-            <div className="text-center">
-              <p className="text-2xl font-bold text-foreground">{progress.remaining}</p>
-              <p className="text-xs text-muted-foreground">剩余课时</p>
-            </div>
-            <div className="text-center">
-              <p className="text-2xl font-bold text-foreground">{progress.total}</p>
-              <p className="text-xs text-muted-foreground">总课时</p>
-            </div>
-            <div className="text-center">
-              <p className="text-2xl font-bold text-foreground">{progress.percentage}%</p>
-              <p className="text-xs text-muted-foreground">完成度</p>
-            </div>
-          </div>
-          <div className="space-y-2">
-            <p className="text-xs text-muted-foreground">已排课: {plannedCount + completedCount} 节 (已上: {completedCount}, 计划: {plannedCount})</p>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Ratings */}
-      <Card className="bg-card border-border mb-6">
-        <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle className="text-sm text-muted-foreground">学员评分</CardTitle>
-          {!isEditingRatings && (
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => setIsEditingRatings(true)}
-            >
-              编辑评分
+    <div className="min-h-screen bg-background pb-20">
+      {/* 顶部导航 */}
+      <div className="sticky top-0 z-10 bg-background border-b border-border">
+        <div className="flex items-center justify-between px-4 py-3">
+          <div className="flex items-center gap-3">
+            <Button variant="ghost" size="sm" onClick={onBack} className="p-2">
+              <ArrowLeft className="w-5 h-5" />
             </Button>
-          )}
-        </CardHeader>
-        <CardContent>
-          <div className="grid gap-6 md:grid-cols-2">
             <div>
-              {isEditingRatings ? (
-                <div className="space-y-4">
-                  {Object.entries(ratings).map(([key, value]) => {
-                    const labels: Record<string, string> = {
-                      trust: '信任度',
-                      execution: '执行力',
-                      cognition: '认知水平',
-                      learning: '求知欲',
-                      loyalty: '粘性',
-                    }
-                    return (
-                      <div key={key} className="space-y-1">
-                        <Label className="text-sm">{labels[key]}</Label>
-                        <div className="flex items-center gap-2">
-                          {[1, 2, 3, 4, 5].map((star) => (
-                            <button
-                              key={star}
-                              onClick={() =>
-                                handleRatingChange(key as keyof RatingDimensions, star)
-                              }
-                              className={`transition-colors ${
-                                star <= value
-                                  ? 'text-yellow-400'
-                                  : 'text-gray-300'
-                              }`}
-                            >
-                              <Star className="w-5 h-5 fill-current" />
-                            </button>
-                          ))}
-                          <span className="text-sm text-muted-foreground">
-                            {value}/5
-                          </span>
-                        </div>
-                      </div>
-                    )
-                  })}
-                  <div className="pt-4 flex gap-2">
-                    <Button size="sm" onClick={handleSaveRatings}>
-                      保存
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => setIsEditingRatings(false)}
-                    >
-                      取消
-                    </Button>
+              <h1 className="text-lg font-semibold">{student.name}</h1>
+              <p className="text-xs text-muted-foreground">
+                {progress.completed}/{student.totalSessions} 节 · {progress.percentage}%
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <Badge variant={student.status === 'active' ? 'default' : student.status === 'paused' ? 'secondary' : 'outline'}>
+              {student.status === 'active' ? '活跃' : student.status === 'paused' ? '暂停' : '已结课'}
+            </Badge>
+            <Button variant="outline" size="sm" onClick={onEdit}>
+              编辑
+            </Button>
+          </div>
+        </div>
+
+        {/* Tab导航 */}
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+          <TabsList className="w-full justify-start h-auto p-0 bg-transparent border-b-0 overflow-x-auto">
+            <TabsTrigger 
+              value="info" 
+              className="data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none px-4 py-2"
+            >
+              <User className="w-4 h-4 mr-1.5" />
+              基本信息
+            </TabsTrigger>
+            <TabsTrigger 
+              value="plan" 
+              className="data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none px-4 py-2"
+            >
+              <ClipboardList className="w-4 h-4 mr-1.5" />
+              训练计划
+            </TabsTrigger>
+            <TabsTrigger 
+              value="records" 
+              className="data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none px-4 py-2"
+            >
+              <BookOpen className="w-4 h-4 mr-1.5" />
+              训练记录
+            </TabsTrigger>
+            <TabsTrigger 
+              value="effect" 
+              className="data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none px-4 py-2"
+            >
+              <TrendingUp className="w-4 h-4 mr-1.5" />
+              训练效果
+            </TabsTrigger>
+            <TabsTrigger 
+              value="export" 
+              className="data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none px-4 py-2"
+            >
+              <FileDown className="w-4 h-4 mr-1.5" />
+              导出PDF
+            </TabsTrigger>
+          </TabsList>
+        </Tabs>
+      </div>
+
+      {/* Tab内容 */}
+      <div className="p-4">
+        <Tabs value={activeTab} onValueChange={setActiveTab}>
+          {/* 基本信息Tab */}
+          <TabsContent value="info" className="mt-0 space-y-6">
+            {/* 进度概览 */}
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base">课程进度</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="flex items-center gap-4">
+                  <div className="flex-1">
+                    <div className="flex justify-between text-sm mb-1">
+                      <span>已完成 {progress.completed} 节</span>
+                      <span>剩余 {progress.remaining} 节</span>
+                    </div>
+                    <div className="h-3 bg-muted rounded-full overflow-hidden">
+                      <div 
+                        className="h-full bg-primary transition-all" 
+                        style={{ width: `${progress.percentage}%` }}
+                      />
+                    </div>
+                  </div>
+                  <div className="text-2xl font-bold text-primary">{progress.percentage}%</div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* 费用信息 */}
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base">费用信息</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="p-3 bg-muted/50 rounded-lg">
+                    <p className="text-xs text-muted-foreground">总费用</p>
+                    <p className="text-lg font-semibold">¥{student.totalFee.toLocaleString()}</p>
+                  </div>
+                  <div className="p-3 bg-muted/50 rounded-lg">
+                    <p className="text-xs text-muted-foreground">单节课价</p>
+                    <p className="text-lg font-semibold">¥{student.sessionPrice.toLocaleString()}</p>
+                  </div>
+                  <div className="p-3 bg-muted/50 rounded-lg">
+                    <p className="text-xs text-muted-foreground">场地费/节</p>
+                    <p className="text-lg font-semibold">¥{student.venueFee}</p>
+                  </div>
+                  <div className="p-3 bg-success/10 rounded-lg">
+                    <p className="text-xs text-success">单节利润</p>
+                    <p className="text-lg font-semibold text-success">
+                      {formatProfit(student.sessionIncome || (student.sessionPrice - student.venueFee))}
+                    </p>
                   </div>
                 </div>
-              ) : (
-                <div className="space-y-3">
-                  <div className="text-center">
-                    <p className="text-3xl font-bold text-foreground">
-                      {compositeScore.toFixed(1)}
-                    </p>
-                    <p className="text-sm text-muted-foreground">综合评分 / 5.0</p>
+              </CardContent>
+            </Card>
+
+            {/* 联系方式 */}
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base">联系方式</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {student.phone && (
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">电话</span>
+                    <span>{student.phone}</span>
                   </div>
-                  {student.ratings && (
-                    <div className="space-y-2 text-sm">
-                      {[
-                        ['trust', '信任度', student.ratings.trust],
-                        ['execution', '执行力', student.ratings.execution],
-                        ['cognition', '认知水平', student.ratings.cognition],
-                        ['learning', '求知欲', student.ratings.learning],
-                        ['loyalty', '粘性', student.ratings.loyalty],
-                      ].map(([, label, value]) => (
-                        <div key={label} className="flex items-center gap-3">
-                          <span className="text-muted-foreground w-16">{label}</span>
-                          <div className="flex gap-0.5">
-                            {[1, 2, 3, 4, 5].map((i) => (
-                              <Star
-                                key={i}
-                                className={`w-4 h-4 ${
-                                  i <= (value as number)
-                                    ? 'fill-yellow-400 text-yellow-400'
-                                    : 'text-gray-300'
-                                }`}
-                              />
+                )}
+                {student.wechat && (
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">微信</span>
+                    <span>{student.wechat}</span>
+                  </div>
+                )}
+                {student.source && (
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">来源</span>
+                    <span>
+                      {student.source === 'social_media' ? '社媒' :
+                       student.source === 'referral' ? '转介绍' :
+                       student.source === 'friend' ? '朋友' : '其他'}
+                    </span>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* 训练背景 */}
+            {student.trainingBackground && (
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base">训练背景</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-sm text-muted-foreground whitespace-pre-wrap">
+                    {student.trainingBackground}
+                  </p>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* 五维评分 */}
+            <Card>
+              <CardHeader className="pb-3">
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-base">五维评分</CardTitle>
+                  <div className="flex items-center gap-2">
+                    {compositeScore > 0 && (
+                      <Badge variant="outline" className="text-primary">
+                        综合 {compositeScore.toFixed(1)} 分
+                      </Badge>
+                    )}
+                    {isEditingRatings ? (
+                      <div className="flex gap-1">
+                        <Button size="sm" variant="ghost" onClick={() => setIsEditingRatings(false)}>取消</Button>
+                        <Button size="sm" onClick={handleRatingSave}>保存</Button>
+                      </div>
+                    ) : (
+                      <Button size="sm" variant="outline" onClick={() => setIsEditingRatings(true)}>编辑</Button>
+                    )}
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent>
+                {isEditingRatings ? (
+                  <div className="space-y-4">
+                    {(['trust', 'execution', 'cognition', 'learning', 'loyalty'] as const).map((key) => {
+                      const labels: Record<string, string> = {
+                        trust: '信任度',
+                        execution: '执行力',
+                        cognition: '认知水平',
+                        learning: '求知欲',
+                        loyalty: '粘性',
+                      }
+                      return (
+                        <div key={key} className="flex items-center gap-3">
+                          <span className="w-20 text-sm">{labels[key]}</span>
+                          <div className="flex gap-1">
+                            {[1, 2, 3, 4, 5].map((v) => (
+                              <Button
+                                key={v}
+                                size="sm"
+                                variant={ratings[key] >= v ? 'default' : 'outline'}
+                                className="w-8 h-8 p-0"
+                                onClick={() => handleRatingChange(key, v)}
+                              >
+                                <Star className={`w-4 h-4 ${ratings[key] >= v ? 'fill-current' : ''}`} />
+                              </Button>
                             ))}
                           </div>
-                          <span className="font-medium w-8 text-right">{value}/5</span>
+                          <span className="text-sm text-muted-foreground">{ratings[key] || 0}/5</span>
                         </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
+                      )
+                    })}
+                  </div>
+                ) : (
+                  <div className="h-[200px]">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <RadarChart data={radarData}>
+                        <PolarGrid stroke="hsl(var(--border))" />
+                        <PolarAngleAxis dataKey="name" tick={{ fontSize: 12, fill: 'hsl(var(--muted-foreground))' }} />
+                        <PolarRadiusAxis domain={[0, 5]} tick={{ fontSize: 10 }} axisLine={false} />
+                        <Radar
+                          name="评分"
+                          dataKey="value"
+                          stroke="hsl(var(--primary))"
+                          fill="hsl(var(--primary))"
+                          fillOpacity={0.3}
+                        />
+                      </RadarChart>
+                    </ResponsiveContainer>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
 
-            {student.ratings && !isEditingRatings && (
-              <div className="flex items-center justify-center">
-                <ResponsiveContainer width="100%" height={200}>
-                  <RadarChart data={radarData}>
-                    <PolarGrid stroke="hsl(var(--border))" />
-                    <PolarAngleAxis dataKey="name" stroke="hsl(var(--muted-foreground))" tick={{ fontSize: 11 }} />
-                    <PolarRadiusAxis
-                      angle={90}
-                      domain={[0, 5]}
-                      tick={false}
-                      axisLine={false}
+            {/* 文档资料 */}
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base">文档资料</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {/* 训练计划PDF */}
+                <div className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
+                  <div className="flex items-center gap-2">
+                    <FileText className="w-5 h-5 text-muted-foreground" />
+                    <span className="text-sm">训练计划</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {student.trainingPlanPdf ? (
+                      <>
+                        <Button size="sm" variant="ghost" onClick={() => setPreviewPdf(student.trainingPlanPdf!)}>
+                          <Eye className="w-4 h-4" />
+                        </Button>
+                        <Button size="sm" variant="ghost" onClick={() => onUpdateStudent?.({ trainingPlanPdf: undefined })}>
+                          <X className="w-4 h-4" />
+                        </Button>
+                      </>
+                    ) : (
+                      <Button size="sm" variant="outline" onClick={() => trainingPlanInputRef.current?.click()}>
+                        <Upload className="w-4 h-4 mr-1" />
+                        上传
+                      </Button>
+                    )}
+                    <input
+                      ref={trainingPlanInputRef}
+                      type="file"
+                      accept=".pdf"
+                      className="hidden"
+                      onChange={(e) => handleFileUpload('trainingPlan', e)}
                     />
-                    <Radar
-                      name="评分"
-                      dataKey="value"
-                      stroke="hsl(var(--primary))"
-                      fill="hsl(var(--primary))"
-                      fillOpacity={0.25}
+                  </div>
+                </div>
+
+                {/* 合同PDF */}
+                <div className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
+                  <div className="flex items-center gap-2">
+                    <FileText className="w-5 h-5 text-muted-foreground" />
+                    <span className="text-sm">合同文件</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {student.contractPdf ? (
+                      <>
+                        <Button size="sm" variant="ghost" onClick={() => setPreviewPdf(student.contractPdf!)}>
+                          <Eye className="w-4 h-4" />
+                        </Button>
+                        <Button size="sm" variant="ghost" onClick={() => onUpdateStudent?.({ contractPdf: undefined })}>
+                          <X className="w-4 h-4" />
+                        </Button>
+                      </>
+                    ) : (
+                      <Button size="sm" variant="outline" onClick={() => contractInputRef.current?.click()}>
+                        <Upload className="w-4 h-4 mr-1" />
+                        上传
+                      </Button>
+                    )}
+                    <input
+                      ref={contractInputRef}
+                      type="file"
+                      accept=".pdf"
+                      className="hidden"
+                      onChange={(e) => handleFileUpload('contract', e)}
                     />
-                  </RadarChart>
-                </ResponsiveContainer>
-              </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* 学员状态 */}
+            {student.status === 'ended' && (
+              <Card className="border-muted-foreground/50">
+                <CardContent className="py-4">
+                  <div className="flex items-center justify-center gap-2">
+                    <Badge variant="secondary" className="text-base px-4 py-1">已结课</Badge>
+                    {student.refundAmount && (
+                      <Badge variant="destructive" className="text-base px-4 py-1">
+                        退费 ¥{student.refundAmount.toLocaleString()}
+                      </Badge>
+                    )}
+                    {student.endedAt && (
+                      <span className="text-sm text-muted-foreground">
+                        结课时间: {new Date(student.endedAt).toLocaleDateString('zh-CN')}
+                      </span>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
             )}
-          </div>
-        </CardContent>
-      </Card>
 
-      {/* Training Info */}
-      {student.trainingBackground && (
-        <Card className="bg-card border-border mb-6">
-          <CardHeader>
-            <CardTitle className="text-sm text-muted-foreground">训练背景和目标</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-sm text-foreground whitespace-pre-wrap">{student.trainingBackground}</p>
-          </CardContent>
-        </Card>
-      )}
+            {/* 操作按钮区域 */}
+            {student.status !== 'ended' && (
+              <Card>
+                <CardContent className="py-4">
+                  <div className="flex flex-wrap justify-center gap-3">
+                    <Button
+                      size="lg"
+                      variant="outline"
+                      className={needRenewal 
+                        ? "text-success border-success/50 font-semibold" 
+                        : "text-success border-success/40"
+                      }
+                      onClick={() => onRenewStudent?.(student)}
+                    >
+                      <RefreshCw className="w-4 h-4 mr-2" />
+                      续课
+                    </Button>
+                    <Button
+                      size="lg"
+                      variant="outline"
+                      className="text-blue border-blue/40"
+                      onClick={() => onPauseCourse?.(student.id)}
+                    >
+                      <Pause className="w-4 h-4 mr-2" />
+                      暂停
+                    </Button>
+                    <Button
+                      size="lg"
+                      variant="outline"
+                      className="text-foreground border-border"
+                      onClick={() => onEndCourse?.(student.id)}
+                    >
+                      <CheckCircle className="w-4 h-4 mr-2" />
+                      结课
+                    </Button>
+                    <Button
+                      size="lg"
+                      variant="outline"
+                      className="text-destructive border-destructive/40"
+                      onClick={() => setShowRefundDialog(true)}
+                    >
+                      <DollarSign className="w-4 h-4 mr-2" />
+                      退费
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+          </TabsContent>
 
-      {/* Documents */}
-      <Card className="bg-card border-border mb-6">
-        <CardHeader>
-          <CardTitle className="text-sm text-muted-foreground">文档管理</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid gap-4 md:grid-cols-2">
-            {/* 训练计划 */}
-            <div className="space-y-2">
-              <Label className="text-sm font-medium">训练计划PDF</Label>
-              <input
-                ref={trainingPlanInputRef}
-                type="file"
-                accept=".pdf"
-                className="hidden"
-                onChange={(e) => handleFileUpload('trainingPlan', e)}
-              />
-              {student.trainingPlanPdf ? (
-                <div className="flex items-center gap-2">
-                  <Button 
-                    size="sm" 
-                    variant="outline" 
-                    className="gap-1"
-                    onClick={() => setPreviewPdf(student.trainingPlanPdf!)}
-                  >
-                    <Eye className="w-3 h-3" />
-                    预览
-                  </Button>
-                  <Button 
-                    size="sm" 
-                    variant="outline"
-                    onClick={() => trainingPlanInputRef.current?.click()}
-                  >
-                    <Upload className="w-3 h-3" />
-                    更换
-                  </Button>
-                </div>
-              ) : (
-                <Button 
-                  size="sm" 
-                  variant="outline" 
-                  className="gap-1"
-                  onClick={() => trainingPlanInputRef.current?.click()}
-                >
-                  <Upload className="w-3 h-3" />
-                  上传训练计划
-                </Button>
-              )}
-            </div>
+          {/* 训练计划Tab */}
+          <TabsContent value="plan" className="mt-0">
+            <TrainingPlanTab 
+              student={student} 
+              onUpdateStudent={onUpdateStudent || (() => {})} 
+            />
+          </TabsContent>
 
-            {/* 合同 */}
-            <div className="space-y-2">
-              <Label className="text-sm font-medium">合同文档</Label>
-              <input
-                ref={contractInputRef}
-                type="file"
-                accept=".pdf"
-                className="hidden"
-                onChange={(e) => handleFileUpload('contract', e)}
-              />
-              {student.contractPdf ? (
-                <div className="flex items-center gap-2">
-                  <Button 
-                    size="sm" 
-                    variant="outline" 
-                    className="gap-1"
-                    onClick={() => setPreviewPdf(student.contractPdf!)}
-                  >
-                    <Eye className="w-3 h-3" />
-                    预览
-                  </Button>
-                  <Button 
-                    size="sm" 
-                    variant="outline"
-                    onClick={() => contractInputRef.current?.click()}
-                  >
-                    <Upload className="w-3 h-3" />
-                    更换
-                  </Button>
-                </div>
-              ) : (
-                <Button 
-                  size="sm" 
-                  variant="outline" 
-                  className="gap-1"
-                  onClick={() => contractInputRef.current?.click()}
-                >
-                  <Upload className="w-3 h-3" />
-                  上传合同
-                </Button>
-              )}
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+          {/* 训练记录Tab */}
+          <TabsContent value="records" className="mt-0">
+            <SessionRecordsTab 
+              student={student}
+              sessions={sessions}
+              sessionRecords={studentRecords}
+              onUpdateSessionRecord={onUpdateSessionRecord || (() => {})}
+            />
+          </TabsContent>
 
-      {/* 学员状态 */}
-      {student.status === 'ended' && (
-        <Card className="bg-card border-border border-muted-foreground/50 mb-6">
-          <CardContent className="py-4">
-            <div className="flex items-center justify-center gap-2">
-              <Badge variant="secondary" className="text-base px-4 py-1">已结课</Badge>
-              {student.refundAmount && (
-                <Badge variant="destructive" className="text-base px-4 py-1">
-                  退费 ¥{student.refundAmount.toLocaleString()}
-                </Badge>
-              )}
-              {student.endedAt && (
-                <span className="text-sm text-muted-foreground">
-                  结课时间: {new Date(student.endedAt).toLocaleDateString('zh-CN')}
-                </span>
-              )}
-            </div>
-          </CardContent>
-        </Card>
-      )}
+          {/* 训练效果Tab */}
+          <TabsContent value="effect" className="mt-0">
+            <TrainingEffectTab 
+              student={student}
+              onUpdateStudent={onUpdateStudent || (() => {})}
+            />
+          </TabsContent>
 
-      {/* 操作按钮区域 - 仅在非结课状态显示 */}
-      {student.status !== 'ended' && (
-        <Card className="bg-card border-border mb-6">
-          <CardContent className="py-4">
-            <div className="flex flex-wrap justify-center gap-3">
-              <Button
-                size="lg"
-                className={needRenewal 
-                  ? "bg-success hover:bg-success/90 text-white animate-pulse" 
-                  : "bg-success hover:bg-success/90 text-white"
-                }
-                onClick={() => onRenewStudent?.(student)}
-              >
-                <RefreshCw className="w-4 h-4 mr-2" />
-                续课
-              </Button>
-              <Button
-                size="lg"
-                className="bg-blue hover:bg-blue/90 text-white"
-                onClick={() => onPauseCourse?.(student.id)}
-              >
-                <Pause className="w-4 h-4 mr-2" />
-                暂停
-              </Button>
-              <Button
-                size="lg"
-                className="bg-foreground hover:bg-foreground/90 text-background"
-                onClick={() => onEndCourse?.(student.id)}
-              >
-                <CheckCircle className="w-4 h-4 mr-2" />
-                结课
-              </Button>
-              <Button
-                size="lg"
-                className="bg-destructive hover:bg-destructive/90 text-white"
-                onClick={() => setShowRefundDialog(true)}
-              >
-                <DollarSign className="w-4 h-4 mr-2" />
-                退费
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      )}
+          {/* PDF导出Tab */}
+          <TabsContent value="export" className="mt-0">
+            <PdfExportTab 
+              student={student}
+              sessions={sessions}
+              sessionRecords={studentRecords}
+            />
+          </TabsContent>
+        </Tabs>
+      </div>
 
       {/* 退费弹窗 */}
       {showRefundDialog && (
@@ -597,19 +632,15 @@ export function StudentDetail({
       {/* PDF预览弹窗 */}
       {previewPdf && (
         <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4">
-          <div className="bg-card rounded-lg w-full max-w-4xl h-[90vh] flex flex-col">
-            <div className="flex items-center justify-between p-4 border-b border-border">
-              <h3 className="font-medium">PDF预览</h3>
-              <Button variant="ghost" size="icon" onClick={() => setPreviewPdf(null)}>
-                <X className="w-4 h-4" />
+          <div className="bg-background rounded-lg w-full max-w-4xl h-[80vh] flex flex-col">
+            <div className="flex items-center justify-between p-4 border-b">
+              <span className="font-medium">文档预览</span>
+              <Button variant="ghost" size="sm" onClick={() => setPreviewPdf(null)}>
+                <X className="w-5 h-5" />
               </Button>
             </div>
             <div className="flex-1 p-4">
-              <iframe
-                src={previewPdf}
-                className="w-full h-full rounded border border-border"
-                title="PDF预览"
-              />
+              <iframe src={previewPdf} className="w-full h-full rounded border" />
             </div>
           </div>
         </div>

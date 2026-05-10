@@ -13,18 +13,89 @@ export interface RenewalRecord {
 }
 
 export interface RatingDimensions {
-  trust: number // 信任度
-  execution: number // 执行力
-  cognition: number // 认知水平
-  learning: number // 求知欲
-  loyalty: number // 粘性
+  trust: number
+  execution: number
+  cognition: number
+  learning: number
+  loyalty: number
 }
 
 export type StudentStatus = 'active' | 'paused' | 'ended'
 
+// 身体信息
+export interface BodyInfo {
+  age?: number
+  height?: number // cm
+  weight?: number // kg
+  bodyFatPercentage?: number // %
+  skeletalMusclePercentage?: number // % 骨骼肌率
+  trainingGoal?: string
+  bodyPhotoUrl?: string
+  bodyPhotoBase64?: string // Base64编码的照片（本地上传）
+}
+
+// 训练项目（在阶段中）
+export interface TrainingProject {
+  id: string
+  name: string
+  description: string
+}
+
+// 训练阶段
+export interface TrainingPhase {
+  id: string
+  name: string
+  duration: string // 例如 "4周"
+  sessionCount: number // 对应节数
+  trainingProjects: TrainingProject[]
+  dietSuggestions: string
+}
+
+// 新的训练计划结构
+export interface TrainingPlan {
+  bodyInfo: BodyInfo
+  overallStrategy: string // 整体训练策略（自由文本框）
+  phases: TrainingPhase[]
+}
+
+// 单次训练效果记录
+export interface TrainingEffectRecord {
+  id: string
+  date: string
+  lessonNumber: number
+  weight?: number // 体重 kg
+  bodyFatPercentage?: number // 体脂率 %
+  skeletalMusclePercentage?: number // 骨骼肌率 %
+  photoUrl: string
+  summary: string
+  createdAt: string
+}
+
+// 训练效果集合
+export interface TrainingEffect {
+  records: TrainingEffectRecord[]
+}
+
+// 单节课训练记录
+export interface SessionRecord {
+  id: string
+  studentId: string
+  lessonNumber: number
+  date: string
+  trainingItems: TrainingItem[]
+  overallStatus: string
+  statusNote: string
+  coachMemo: string
+  includeMemoInPdf: boolean
+  createdAt: string
+  updatedAt: string
+}
+
 export interface Student {
   id: string
   name: string
+  phone?: string
+  wechat?: string
   courseType: CourseType
   source: StudentSource
   totalSessions: number
@@ -34,17 +105,20 @@ export interface Student {
   venueFee: number
   sessionIncome: number
   trainingBackground: string
+  trainingPlan?: TrainingPlan
+  photos?: StudentPhotos
+  trainingEffect?: TrainingEffect
   trainingPlanPdf?: string
   contractPdf?: string
   renewalHistory: RenewalRecord[]
-  ratings?: RatingDimensions // 五维评分
+  ratings?: RatingDimensions
   ratings_updated_at?: string
   createdAt: string
-  status?: StudentStatus // 学员状态: active/paused/ended
-  pausedAt?: string // 暂停时间
-  endedAt?: string // 结课时间
-  refundAmount?: number // 退费金额
-  refundAt?: string // 退费时间
+  status?: StudentStatus
+  pausedAt?: string
+  endedAt?: string
+  refundAmount?: number
+  refundAt?: string
 }
 
 export type SessionStatus = 'planned' | 'completed'
@@ -73,7 +147,6 @@ export interface MonthlyStats {
   completedSessions: number
 }
 
-// Utility types for progress color determination
 export type ProgressColorType = 'success' | 'warning' | 'destructive'
 
 export interface StudentProgressInfo {
