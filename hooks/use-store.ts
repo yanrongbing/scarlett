@@ -167,6 +167,24 @@ export function useStore() {
     ))
   }, [])
 
+  // End course - mark student as ended (set totalSessions = completedSessions)
+  const endCourse = useCallback((studentId: string) => {
+    setStudents(prev => prev.map(s => {
+      if (s.id !== studentId) return s
+      
+      // Count actual completed sessions
+      const completedCount = sessions.filter(
+        session => session.studentId === studentId && session.status === 'completed'
+      ).length
+      
+      return {
+        ...s,
+        totalSessions: completedCount, // Set total to completed, making remaining = 0
+        completedSessions: completedCount,
+      }
+    }))
+  }, [sessions])
+
   // Session operations
   const addSession = useCallback((session: Omit<Session, 'id' | 'createdAt'>) => {
     const newSession: Session = {
@@ -273,6 +291,7 @@ export function useStore() {
     confirmRenewal,
     deleteRenewal,
     updateStudentRatings,
+    endCourse,
     addSession,
     updateSession,
     deleteSession,

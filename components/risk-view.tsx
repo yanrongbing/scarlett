@@ -3,7 +3,6 @@
 import { useMemo } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { Progress } from '@/components/ui/progress'
 import { Bell, AlertCircle, CheckCircle, Wallet, User, RefreshCw, Star, Clock, FileText, VolumeX } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
@@ -14,6 +13,8 @@ interface RiskViewProps {
   sessions: Session[]
   getStudent: (id: string) => Student | undefined
   onRenewStudent?: (student: Student) => void
+  onSelectStudent?: (student: Student) => void
+  onEndCourse?: (studentId: string) => void
 }
 
 interface RiskStudent {
@@ -42,7 +43,7 @@ function getWeekRange(date: Date, weeksAgo: number = 0) {
   return { start: monday, end: sunday }
 }
 
-export function RiskView({ students, sessions, getStudent, onRenewStudent }: RiskViewProps) {
+export function RiskView({ students, sessions, getStudent, onRenewStudent, onSelectStudent, onEndCourse }: RiskViewProps) {
   // 近1周新增学员
   const newStudentsThisWeek = useMemo(() => {
     const now = new Date()
@@ -69,15 +70,23 @@ export function RiskView({ students, sessions, getStudent, onRenewStudent }: Ris
       .sort((a, b) => a.remaining - b.remaining)
   }, [students, sessions])
 
-  // 近两周重点学员（按上课次数排序）
+  // 近两周重点学员（本周和下周排课超过4节的学员）
   const topStudents = useMemo(() => {
     const now = new Date()
     const thisWeek = getWeekRange(now, 0)
-    const lastWeek = getWeekRange(now, 1)
     
-    const startStr = lastWeek.start.toISOString().split('T')[0]
-    const endStr = thisWeek.end.toISOString().split('T')[0]
+    // 计算下周范围
+    const nextWeekStart = new Date(thisWeek.end)
+    nextWeekStart.setDate(nextWeekStart.getDate() + 1)
+    nextWeekStart.setHours(0, 0, 0, 0)
+    const nextWeekEnd = new Date(nextWeekStart)
+    nextWeekEnd.setDate(nextWeekEnd.getDate() + 6)
+    nextWeekEnd.setHours(23, 59, 59, 999)
     
+    const startStr = thisWeek.start.toISOString().split('T')[0]
+    const endStr = nextWeekEnd.toISOString().split('T')[0]
+    
+    // 只统计本周和下周的课程
     const twoWeekSessions = sessions.filter(s => s.date >= startStr && s.date <= endStr)
     
     const studentSessionCounts: Record<string, number> = {}
@@ -90,9 +99,8 @@ export function RiskView({ students, sessions, getStudent, onRenewStudent }: Ris
         const student = getStudent(studentId)
         return { student, count }
       })
-      .filter(item => item.student)
+      .filter(item => item.student && item.count > 4) // 只展示超过4节的学员
       .sort((a, b) => b.count - a.count)
-      .slice(0, 8)
   }, [sessions, getStudent])
 
   // 近期静默学员（近2周未排课）
@@ -241,17 +249,30 @@ export function RiskView({ students, sessions, getStudent, onRenewStudent }: Ris
                       <p className="text-xs text-muted-foreground">剩{remaining}节/已完成{completed}节</p>
                     </div>
                   </div>
-                  {onRenewStudent && (
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="h-6 text-xs gap-1 px-2 flex-shrink-0 border-warning/50 text-warning hover:bg-warning/10"
-                      onClick={() => onRenewStudent(student)}
-                    >
-                      <RefreshCw className="w-3 h-3" />
-                      续课
-                    </Button>
-                  )}
+                  <div className="flex items-center gap-1 flex-shrink-0">
+                    {onRenewStudent && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-6 text-xs gap-1 px-2 border-warning/50 text-warning hover:bg-warning/10"
+                        onClick={() => onRenewStudent(student)}
+                      >
+                        <RefreshCw className="w-3 h-3" />
+                        续课
+                      </Button>
+                    )}
+                    {onEndCourse && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-6 text-xs gap-1 px-2 border-muted-foreground/50 text-muted-foreground hover:bg-muted/50"
+                        onClick={() => onEndCourse(student.id)}
+                      >
+                        <CheckCircle className="w-3 h-3" />
+                        结课
+                      </Button>
+                    )}
+                  </div>
                 </div>
               ))}
             </div>
@@ -379,20 +400,21 @@ export function RiskView({ students, sessions, getStudent, onRenewStudent }: Ris
                       <span className="text-muted-foreground">课时</span>
                       <span className="text-foreground">{completed}/{student.totalSessions} (剩{remaining})</span>
                     </div>
-                    <Progress 
-                      value={100 - remainingPercent} 
-                      className={cn(
-                        "h-1",
-                        !isNew && riskLevel === 'high' && "[&>div]:bg-destructive",
-                        !isNew && riskLevel === 'medium' && "[&>div]:bg-warning",
-                        isNew && "[&>div]:bg-chart-2"
-                      )}
-                    />
+                    <div className="h-1.5 bg-muted rounded-full overflow-hidden">
+                      <div 
+                        className={cn(
+                          "h-full rounded-full transition-all",
+                          remaining > 8 && "bg-success",
+                          remaining >= 3 && remaining <= 8 && "bg-warning",
+                          remaining < 3 && "bg-destructive"
+                        )}
+                        style={{ width: `${Math.min(100 - remainingPercent, 100)}%` }}
+                      />
+                    </div>
                   </div>
                   
                   <div className="flex justify-between text-xs mt-1">
                     <span className="text-muted-foreground">剩余 {remainingPercent.toFixed(0)}%</span>
-                    <span className="text-muted-foreground">预留退费 ¥{Math.round(refundReserve).toLocaleString()}</span>
                   </div>
                 </div>
               ))}
