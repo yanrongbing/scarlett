@@ -20,17 +20,19 @@ export function TrainingEffectTab({ student, onUpdateStudent }: TrainingEffectTa
   const afterInputRef = useRef<HTMLInputElement>(null)
   const progressInputRef = useRef<HTMLInputElement>(null)
 
-  const photos: StudentPhotos = student.photos || {
-    beforePhotos: [],
-    afterPhotos: [],
-    progressPhotos: [],
+  const rawPhotos = student.photos || {}
+  const photos: StudentPhotos = {
+    beforePhotos: Array.isArray(rawPhotos.beforePhotos) ? rawPhotos.beforePhotos : [],
+    afterPhotos: Array.isArray(rawPhotos.afterPhotos) ? rawPhotos.afterPhotos : [],
+    progressPhotos: Array.isArray(rawPhotos.progressPhotos) ? rawPhotos.progressPhotos : [],
   }
 
-  const trainingEffect: TrainingEffect = student.trainingEffect || {
-    summary: '',
-    improvements: [],
-    challenges: [],
-    nextSteps: '',
+  const rawEffect = student.trainingEffect || {}
+  const trainingEffect: TrainingEffect = {
+    summary: rawEffect.summary || '',
+    improvements: Array.isArray(rawEffect.improvements) ? rawEffect.improvements : [],
+    challenges: Array.isArray(rawEffect.challenges) ? rawEffect.challenges : [],
+    nextSteps: rawEffect.nextSteps || '',
   }
 
   const updatePhotos = (updates: Partial<StudentPhotos>) => {

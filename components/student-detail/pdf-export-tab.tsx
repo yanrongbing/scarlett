@@ -58,7 +58,11 @@ export function PdfExportTab({ student, sessions, sessionRecords }: PdfExportTab
   })
 
   const progress = useMemo(() => getStudentProgress(student, sessions), [student, sessions])
-  const trainingPlan: TrainingPlan = student.trainingPlan || { phases: [], overallGoal: '' }
+  const rawPlan = student.trainingPlan || {}
+  const trainingPlan: TrainingPlan = {
+    phases: Array.isArray(rawPlan.phases) ? rawPlan.phases : [],
+    overallGoal: rawPlan.overallGoal || ''
+  }
 
   const toggleOption = (key: keyof ExportOptions) => {
     setOptions(prev => ({ ...prev, [key]: !prev[key] }))

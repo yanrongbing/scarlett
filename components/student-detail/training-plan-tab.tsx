@@ -33,7 +33,12 @@ export function TrainingPlanTab({ student, onUpdateStudent }: TrainingPlanTabPro
   const [editingPhaseId, setEditingPhaseId] = useState<string | null>(null)
   const [editingItemId, setEditingItemId] = useState<string | null>(null)
   
-  const trainingPlan: TrainingPlan = student.trainingPlan || { phases: [], overallGoal: '' }
+  // 确保 trainingPlan 和 phases 都有默认值
+  const rawPlan = student.trainingPlan || {}
+  const trainingPlan: TrainingPlan = {
+    phases: Array.isArray(rawPlan.phases) ? rawPlan.phases : [],
+    overallGoal: rawPlan.overallGoal || ''
+  }
 
   const updatePlan = (updates: Partial<TrainingPlan>) => {
     onUpdateStudent({
