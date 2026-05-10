@@ -242,17 +242,18 @@ export function StudentsView({
 
   // 操作按钮组件
   const ActionButtons = ({ student, stats, compact = false }: { student: Student; stats: ReturnType<typeof getStudentStats>; compact?: boolean }) => {
-    const buttonClass = compact ? "h-6 text-xs px-2" : "h-7 text-xs px-2"
-    
+    const buttonClass = compact ? "h-7 text-xs px-2 w-full" : "h-7 text-xs px-2"
+
     return (
       <div className={cn(compact ? "grid grid-cols-2 gap-1" : "flex gap-1")}>
         <Button
           size="sm"
+          variant="outline"
           className={cn(
-            buttonClass, "w-full",
-            stats.needRenewal 
-              ? "bg-success hover:bg-success/90 text-white animate-pulse" 
-              : "bg-success hover:bg-success/90 text-white"
+            buttonClass,
+            stats.needRenewal
+              ? "text-success border-success/50 font-semibold"
+              : "text-success border-success/40"
           )}
           onClick={(e) => { e.stopPropagation(); handleRenewal(student) }}
         >
@@ -261,7 +262,8 @@ export function StudentsView({
         </Button>
         <Button
           size="sm"
-          className={cn(buttonClass, "w-full bg-blue hover:bg-blue/90 text-white")}
+          variant="outline"
+          className={cn(buttonClass, "text-blue border-blue/40")}
           onClick={(e) => { e.stopPropagation(); onPauseCourse?.(student.id) }}
         >
           <Pause className="w-3 h-3 mr-1" />
@@ -269,7 +271,8 @@ export function StudentsView({
         </Button>
         <Button
           size="sm"
-          className={cn(buttonClass, "w-full bg-foreground hover:bg-foreground/90 text-background")}
+          variant="outline"
+          className={cn(buttonClass, "text-foreground border-border")}
           onClick={(e) => { e.stopPropagation(); onEndCourse?.(student.id) }}
         >
           <CheckCircle className="w-3 h-3 mr-1" />
@@ -277,7 +280,8 @@ export function StudentsView({
         </Button>
         <Button
           size="sm"
-          className={cn(buttonClass, "w-full bg-destructive hover:bg-destructive/90 text-white")}
+          variant="outline"
+          className={cn(buttonClass, "text-destructive border-destructive/40")}
           onClick={(e) => { e.stopPropagation(); handleRefundStart(student) }}
         >
           <DollarSign className="w-3 h-3 mr-1" />
