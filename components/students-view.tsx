@@ -261,7 +261,7 @@ export function StudentsView({
         </Button>
         <Button
           size="sm"
-          className={cn(buttonClass, "bg-primary hover:bg-primary/90 text-white")}
+          className={cn(buttonClass, "bg-blue hover:bg-blue/90 text-white")}
           onClick={(e) => { e.stopPropagation(); onPauseCourse?.(student.id) }}
         >
           <Pause className="w-3 h-3 mr-1" />

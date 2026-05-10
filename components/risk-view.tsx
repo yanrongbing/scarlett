@@ -309,7 +309,7 @@ export function RiskView({ students, sessions, getStudent, onRenewStudent, onSel
                       <Button
                         size="sm"
                         variant="outline"
-                        className="h-6 text-xs gap-1 px-2 border-primary/50 text-primary hover:bg-primary/10"
+                        className="h-6 text-xs gap-1 px-2 border-blue/50 text-blue hover:bg-blue/10"
                         onClick={() => onPauseCourse(student.id)}
                       >
                         <Clock className="w-3 h-3" />

@@ -494,7 +494,7 @@ export function StudentDetail({
               </Button>
               <Button
                 size="lg"
-                className="bg-primary hover:bg-primary/90 text-white"
+                className="bg-blue hover:bg-blue/90 text-white"
                 onClick={() => onPauseCourse?.(student.id)}
               >
                 <Pause className="w-4 h-4 mr-2" />
