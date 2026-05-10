@@ -447,7 +447,7 @@ export function StudentsView({
                               >
                                 <Edit2 className="w-3 h-3" />
                               </Button>
-                              <ActionButtons student={student} stats={stats} compact />
+                              <ActionButtons student={student} stats={stats} />
                             </div>
                           </td>
                         </tr>
