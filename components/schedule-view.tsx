@@ -19,7 +19,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Checkbox } from '@/components/ui/checkbox'
-import { ChevronLeft, ChevronRight, Clock, MapPin, X } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Clock, MapPin, X, Plus } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { Student, Session } from '@/lib/types'
 
@@ -236,65 +236,83 @@ export function ScheduleView({
                         )}
                         onClick={() => canAddMore && handleSlotClick(dateStr, block.start)}
                       >
-                        <div className="space-y-1 h-full">
-                          {slotSessions.map(session => {
-                            const student = getStudent(session.studentId)
-                            if (!student) return null
-                            return (
-                              <div
-                                key={session.id}
-                                className={cn(
-                                  "rounded p-1 text-xs relative",
-                                  session.status === 'completed' 
-                                    ? "bg-success/20 border border-success/30" 
-                                    : "bg-primary/10 border border-primary/20"
-                                )}
-                                onClick={(e) => e.stopPropagation()}
-                              >
-                                <div className="flex items-start justify-between gap-0.5">
-                                  <div className="flex-1 min-w-0">
-                                    <div className="font-medium truncate text-foreground text-xs">{student.name}</div>
-                                    <div className="text-muted-foreground text-xs">{session.time}</div>
-                                    {session.location && (
-                                      <div className="text-muted-foreground truncate text-xs flex items-center gap-0.5">
-                                        <MapPin className="w-2.5 h-2.5 flex-shrink-0" />
-                                        <span className="truncate">{session.location}</span>
-                                      </div>
-                                    )}
+                        <div className="space-y-1 h-full flex flex-col justify-between">
+                          <div>
+                            {slotSessions.map(session => {
+                              const student = getStudent(session.studentId)
+                              if (!student) return null
+                              return (
+                                <div
+                                  key={session.id}
+                                  className={cn(
+                                    "rounded p-1 text-xs relative",
+                                    session.status === 'completed' 
+                                      ? "bg-success/20 border border-success/30" 
+                                      : "bg-primary/10 border border-primary/20"
+                                  )}
+                                  onClick={(e) => e.stopPropagation()}
+                                >
+                                  <div className="flex items-start justify-between gap-0.5">
+                                    <div className="flex-1 min-w-0">
+                                      <div className="font-medium truncate text-foreground text-xs">{student.name}</div>
+                                      <div className="text-muted-foreground text-xs">{session.time}</div>
+                                      {session.location && (
+                                        <div className="text-muted-foreground truncate text-xs flex items-center gap-0.5">
+                                          <MapPin className="w-2.5 h-2.5 flex-shrink-0" />
+                                          <span className="truncate">{session.location}</span>
+                                        </div>
+                                      )}
+                                    </div>
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      className="h-4 w-4 flex-shrink-0 text-muted-foreground hover:text-destructive"
+                                      onClick={(e) => {
+                                        e.stopPropagation()
+                                        onDeleteSession(session.id)
+                                      }}
+                                    >
+                                      <X className="w-2.5 h-2.5" />
+                                    </Button>
                                   </div>
-                                  <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    className="h-4 w-4 flex-shrink-0 text-muted-foreground hover:text-destructive"
-                                    onClick={(e) => {
-                                      e.stopPropagation()
-                                      onDeleteSession(session.id)
-                                    }}
-                                  >
-                                    <X className="w-2.5 h-2.5" />
-                                  </Button>
+                                  
+                                  <div className="mt-0.5 flex items-center gap-1">
+                                    <Checkbox
+                                      id={`session-${session.id}`}
+                                      checked={session.status === 'completed'}
+                                      onCheckedChange={() => handleToggleComplete(session)}
+                                      className="h-3 w-3 data-[state=checked]:bg-success data-[state=checked]:border-success"
+                                    />
+                                    <label 
+                                      htmlFor={`session-${session.id}`}
+                                      className={cn(
+                                        "text-xs cursor-pointer",
+                                        session.status === 'completed' ? "text-success" : "text-muted-foreground"
+                                      )}
+                                    >
+                                      {session.status === 'completed' ? '完成' : '待上课'}
+                                    </label>
+                                  </div>
                                 </div>
-                                
-                                <div className="mt-0.5 flex items-center gap-1">
-                                  <Checkbox
-                                    id={`session-${session.id}`}
-                                    checked={session.status === 'completed'}
-                                    onCheckedChange={() => handleToggleComplete(session)}
-                                    className="h-3 w-3 data-[state=checked]:bg-success data-[state=checked]:border-success"
-                                  />
-                                  <label 
-                                    htmlFor={`session-${session.id}`}
-                                    className={cn(
-                                      "text-xs cursor-pointer",
-                                      session.status === 'completed' ? "text-success" : "text-muted-foreground"
-                                    )}
-                                  >
-                                    {session.status === 'completed' ? '完成' : '待上课'}
-                                  </label>
-                                </div>
-                              </div>
-                            )
-                          })}
+                              )
+                            })}
+                          </div>
+                          {canAddMore && slotSessions.length > 0 && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="w-full h-auto py-1 text-xs gap-1 mt-1"
+                              onClick={() => handleSlotClick(dateStr, block.start)}
+                            >
+                              <Plus className="w-3 h-3" />
+                              添加课程
+                            </Button>
+                          )}
+                          {canAddMore && slotSessions.length === 0 && (
+                            <div className="text-xs text-muted-foreground text-center py-2 opacity-60">
+                              点击添加课程
+                            </div>
+                          )}
                         </div>
                       </div>
                     )
