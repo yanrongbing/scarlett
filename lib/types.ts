@@ -28,8 +28,10 @@ export interface BodyInfo {
   height?: number // cm
   weight?: number // kg
   bodyFatPercentage?: number // %
+  skeletalMusclePercentage?: number // % 骨骼肌率
   trainingGoal?: string
   bodyPhotoUrl?: string
+  bodyPhotoBase64?: string // Base64编码的照片（本地上传）
 }
 
 // 训练项目（在阶段中）
@@ -61,6 +63,9 @@ export interface TrainingEffectRecord {
   id: string
   date: string
   lessonNumber: number
+  weight?: number // 体重 kg
+  bodyFatPercentage?: number // 体脂率 %
+  skeletalMusclePercentage?: number // 骨骼肌率 %
   photoUrl: string
   summary: string
   createdAt: string

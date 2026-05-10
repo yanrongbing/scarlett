@@ -1,11 +1,11 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Plus, Trash2, Edit2, Save, X } from 'lucide-react'
+import { Plus, Trash2, Edit2, Save, X, Upload, Image as ImageIcon } from 'lucide-react'
 import type { Student, TrainingPlan, TrainingPhase, TrainingProject } from '@/lib/types'
 
 interface TrainingPlanTabProps {
@@ -17,6 +17,7 @@ export function TrainingPlanTab({ student, onUpdateStudent }: TrainingPlanTabPro
   const [isEditingStrategy, setIsEditingStrategy] = useState(false)
   const [editingPhaseId, setEditingPhaseId] = useState<string | null>(null)
   const [newPhase, setNewPhase] = useState(false)
+  const photoInputRef = useRef<HTMLInputElement>(null)
 
   const rawPlan = student.trainingPlan || {}
   const trainingPlan: TrainingPlan = {
@@ -56,6 +57,24 @@ export function TrainingPlanTab({ student, onUpdateStudent }: TrainingPlanTabPro
     handleUpdatePlan({
       phases: trainingPlan.phases.filter(p => p.id !== phaseId),
     })
+  }
+
+  const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    
+    const reader = new FileReader()
+    reader.onload = (event) => {
+      const base64 = event.target?.result as string
+      handleUpdatePlan({
+        bodyInfo: {
+          ...trainingPlan.bodyInfo,
+          bodyPhotoBase64: base64,
+        },
+      })
+    }
+    reader.readAsDataURL(file)
+    e.target.value = ''
   }
 
   return (
@@ -131,6 +150,22 @@ export function TrainingPlanTab({ student, onUpdateStudent }: TrainingPlanTabPro
                 placeholder="20"
               />
             </div>
+            <div>
+              <Label className="text-sm">骨骼肌率（%）</Label>
+              <Input
+                type="number"
+                value={trainingPlan.bodyInfo.skeletalMusclePercentage || ''}
+                onChange={(e) =>
+                  handleUpdatePlan({
+                    bodyInfo: {
+                      ...trainingPlan.bodyInfo,
+                      skeletalMusclePercentage: e.target.value ? parseFloat(e.target.value) : undefined,
+                    },
+                  })
+                }
+                placeholder="40"
+              />
+            </div>
           </div>
           <div>
             <Label className="text-sm">训练目标</Label>
@@ -148,19 +183,36 @@ export function TrainingPlanTab({ student, onUpdateStudent }: TrainingPlanTabPro
             />
           </div>
           <div>
-            <Label className="text-sm">体态照片URL</Label>
-            <Input
-              value={trainingPlan.bodyInfo.bodyPhotoUrl || ''}
-              onChange={(e) =>
-                handleUpdatePlan({
-                  bodyInfo: {
-                    ...trainingPlan.bodyInfo,
-                    bodyPhotoUrl: e.target.value,
-                  },
-                })
-              }
-              placeholder="输入照片链接"
-            />
+            <Label className="text-sm">体态照片</Label>
+            <div className="flex gap-2 items-end">
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => photoInputRef.current?.click()}
+              >
+                <Upload className="w-3 h-3 mr-1" />
+                上传照片
+              </Button>
+              {trainingPlan.bodyInfo.bodyPhotoBase64 && (
+                <span className="text-xs text-success">✓ 已上传</span>
+              )}
+              <input
+                ref={photoInputRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={handlePhotoUpload}
+              />
+            </div>
+            {trainingPlan.bodyInfo.bodyPhotoBase64 && (
+              <div className="mt-3 rounded-lg overflow-hidden h-40 bg-muted flex items-center justify-center">
+                <img
+                  src={trainingPlan.bodyInfo.bodyPhotoBase64}
+                  alt="体态照片"
+                  className="max-h-full max-w-full object-cover"
+                />
+              </div>
+            )}
           </div>
         </CardContent>
       </Card>

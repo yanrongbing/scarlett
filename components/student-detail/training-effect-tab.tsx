@@ -17,6 +17,9 @@ export function TrainingEffectTab({ student, onUpdateStudent }: TrainingEffectTa
   const [showAddRecord, setShowAddRecord] = useState(false)
   const [newDate, setNewDate] = useState('')
   const [newLessonNumber, setNewLessonNumber] = useState('')
+  const [newWeight, setNewWeight] = useState('')
+  const [newBodyFatPercentage, setNewBodyFatPercentage] = useState('')
+  const [newSkeletalMusclePercentage, setNewSkeletalMusclePercentage] = useState('')
   const [newPhotoUrl, setNewPhotoUrl] = useState('')
   const [newSummary, setNewSummary] = useState('')
 
@@ -42,6 +45,9 @@ export function TrainingEffectTab({ student, onUpdateStudent }: TrainingEffectTa
       id: Date.now().toString(),
       date: newDate,
       lessonNumber: parseInt(newLessonNumber),
+      weight: newWeight ? parseFloat(newWeight) : undefined,
+      bodyFatPercentage: newBodyFatPercentage ? parseFloat(newBodyFatPercentage) : undefined,
+      skeletalMusclePercentage: newSkeletalMusclePercentage ? parseFloat(newSkeletalMusclePercentage) : undefined,
       photoUrl: newPhotoUrl,
       summary: newSummary,
       createdAt: new Date().toISOString(),
@@ -53,6 +59,9 @@ export function TrainingEffectTab({ student, onUpdateStudent }: TrainingEffectTa
 
     setNewDate('')
     setNewLessonNumber('')
+    setNewWeight('')
+    setNewBodyFatPercentage('')
+    setNewSkeletalMusclePercentage('')
     setNewPhotoUrl('')
     setNewSummary('')
     setShowAddRecord(false)
@@ -104,6 +113,36 @@ export function TrainingEffectTab({ student, onUpdateStudent }: TrainingEffectTa
                   value={newLessonNumber}
                   onChange={(e) => setNewLessonNumber(e.target.value)}
                   placeholder="第几节课"
+                />
+              </div>
+              <div>
+                <Label className="text-sm">体重（kg）</Label>
+                <Input
+                  type="number"
+                  step="0.1"
+                  value={newWeight}
+                  onChange={(e) => setNewWeight(e.target.value)}
+                  placeholder="75.5"
+                />
+              </div>
+              <div>
+                <Label className="text-sm">体脂率（%）</Label>
+                <Input
+                  type="number"
+                  step="0.1"
+                  value={newBodyFatPercentage}
+                  onChange={(e) => setNewBodyFatPercentage(e.target.value)}
+                  placeholder="20.5"
+                />
+              </div>
+              <div>
+                <Label className="text-sm">骨骼肌率（%）</Label>
+                <Input
+                  type="number"
+                  step="0.1"
+                  value={newSkeletalMusclePercentage}
+                  onChange={(e) => setNewSkeletalMusclePercentage(e.target.value)}
+                  placeholder="40.2"
                 />
               </div>
             </div>
@@ -175,6 +214,30 @@ export function TrainingEffectTab({ student, onUpdateStudent }: TrainingEffectTa
                     <Trash2 className="w-3 h-3" />
                   </Button>
                 </div>
+
+                {/* 身体数据 */}
+                {(record.weight || record.bodyFatPercentage || record.skeletalMusclePercentage) && (
+                  <div className="mb-3 p-3 bg-muted rounded-lg grid grid-cols-3 gap-2 text-xs">
+                    {record.weight && (
+                      <div>
+                        <p className="text-muted-foreground">体重</p>
+                        <p className="font-medium">{record.weight} kg</p>
+                      </div>
+                    )}
+                    {record.bodyFatPercentage && (
+                      <div>
+                        <p className="text-muted-foreground">体脂率</p>
+                        <p className="font-medium">{record.bodyFatPercentage}%</p>
+                      </div>
+                    )}
+                    {record.skeletalMusclePercentage && (
+                      <div>
+                        <p className="text-muted-foreground">骨骼肌率</p>
+                        <p className="font-medium">{record.skeletalMusclePercentage}%</p>
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 {/* 照片 */}
                 {record.photoUrl && (

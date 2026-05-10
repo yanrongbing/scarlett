@@ -60,8 +60,9 @@ export function PdfExportTab({ student, sessions, sessionRecords }: PdfExportTab
   const progress = useMemo(() => getStudentProgress(student, sessions), [student, sessions])
   const rawPlan = student.trainingPlan || {}
   const trainingPlan: TrainingPlan = {
+    bodyInfo: rawPlan.bodyInfo || {},
+    overallStrategy: rawPlan.overallStrategy || '',
     phases: Array.isArray(rawPlan.phases) ? rawPlan.phases : [],
-    overallGoal: rawPlan.overallGoal || ''
   }
 
   const toggleOption = (key: keyof ExportOptions) => {
@@ -112,11 +113,15 @@ export function PdfExportTab({ student, sessions, sessionRecords }: PdfExportTab
           .photo { width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: 6px; }
           .improvement { padding: 8px 12px; background: #dcfce7; border-radius: 4px; margin-bottom: 6px; }
           .challenge { padding: 8px 12px; background: #fef3c7; border-radius: 4px; margin-bottom: 6px; }
-          .rating-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; text-align: center; }
-          .rating-item { padding: 10px; background: #f8f9fa; border-radius: 6px; }
-          .rating-value { font-size: 20px; font-weight: 600; color: #0d9488; }
-          .rating-label { font-size: 11px; color: #666; margin-top: 4px; }
-          @media print { body { padding: 20px; } }
+          .data-comparison { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; margin-top: 15px; }
+          .comparison-item { padding: 12px; background: #f8f9fa; border-radius: 6px; }
+          .comparison-label { font-size: 12px; color: #666; margin-bottom: 4px; }
+          .comparison-row { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid #e5e7eb; }
+          .comparison-value { font-weight: 600; }
+          .comparison-change { font-size: 12px; padding: 2px 6px; border-radius: 3px; }
+          .comparison-up { background: #dcfce7; color: #16a34a; }
+          .comparison-down { background: #fee2e2; color: #dc2626; }
+          .comparison-neutral { background: #f3f4f6; color: #6b7280; }
         </style>
       </head>
       <body>
@@ -159,48 +164,28 @@ export function PdfExportTab({ student, sessions, sessionRecords }: PdfExportTab
       html += `
         <div class="section">
           <h2>训练计划</h2>
-          ${trainingPlan.overallGoal ? `
-            <h3>整体目标</h3>
-            <p style="padding: 10px; background: #f0fdfa; border-radius: 6px; margin-bottom: 15px;">${trainingPlan.overallGoal}</p>
+          ${trainingPlan.overallStrategy ? `
+            <h3>整体策略</h3>
+            <p style="padding: 10px; background: #f0fdfa; border-radius: 6px; margin-bottom: 15px;">${trainingPlan.overallStrategy}</p>
           ` : ''}
           ${trainingPlan.phases.map(phase => `
             <div class="phase">
               <div class="phase-header">
                 <span class="phase-name">${phase.name}</span>
-                <span class="phase-range">第 ${phase.sessionsRange[0]} - ${phase.sessionsRange[1]} 节课</span>
+                <span class="phase-range">${phase.duration} · ${phase.sessionCount} 节课</span>
               </div>
-              ${phase.items.map(item => `
-                <div class="item ${item.completed ? 'item-completed' : ''}">
-                  ${item.completed ? '✓' : '○'} ${item.name}
-                  ${item.goal ? `<span style="color: #666; font-size: 12px;"> - ${item.goal}</span>` : ''}
-                </div>
-              `).join('')}
-            </div>
-          `).join('')}
-        </div>
-      `
-    }
-
-    // 训练记录
-    if (options.includeSessionRecords && sessionRecords.length > 0) {
-      html += `
-        <div class="section">
-          <h2>训练记录</h2>
-          ${sessionRecords.filter(r => r.trainingItems.length > 0 || r.overallStatus).map(record => `
-            <div class="record">
-              <div class="record-header">
-                <span class="record-lesson">第 ${record.lessonNumber} 节课</span>
-                ${record.overallStatus ? `<span class="status-badge status-${record.overallStatus}">${statusLabels[record.overallStatus] || ''}</span>` : ''}
-              </div>
-              ${record.trainingItems.map(item => `
-                <div class="training-item">
-                  <span>${item.name}</span>
-                  <span class="status-badge status-${item.status}">${statusLabels[item.status] || ''}</span>
-                </div>
-              `).join('')}
-              ${record.statusNote ? `<p style="margin-top: 10px; font-size: 13px; color: #666;">${record.statusNote}</p>` : ''}
-              ${options.includeCoachMemos && record.includeMemoInPdf && record.coachMemo ? `
-                <p style="margin-top: 10px; font-size: 13px; color: #666; font-style: italic;">教练备注: ${record.coachMemo}</p>
+              ${phase.trainingProjects && phase.trainingProjects.length ? `
+                <h3 style="font-size: 13px; margin: 8px 0 4px;">训练项目：</h3>
+                ${phase.trainingProjects.map(proj => `
+                  <div class="item">
+                    <strong>${proj.name}</strong>
+                    ${proj.description ? `<p style="font-size: 12px; color: #666; margin-top: 2px;">${proj.description}</p>` : ''}
+                  </div>
+                `).join('')}
+              ` : ''}
+              ${phase.dietSuggestions ? `
+                <h3 style="font-size: 13px; margin: 8px 0 4px;">饮食建议：</h3>
+                <p style="font-size: 12px; color: #666; margin-bottom: 4px;">${phase.dietSuggestions}</p>
               ` : ''}
             </div>
           `).join('')}
@@ -208,85 +193,159 @@ export function PdfExportTab({ student, sessions, sessionRecords }: PdfExportTab
       `
     }
 
-    // 照片
-    if (options.includePhotos && student.photos) {
-      const { beforePhotos, afterPhotos, progressPhotos } = student.photos
-      if (beforePhotos?.length || afterPhotos?.length || progressPhotos?.length) {
-        html += `
-          <div class="section">
-            <h2>训练照片</h2>
-            ${beforePhotos?.length ? `
-              <h3>训练前</h3>
-              <div class="photo-grid">
-                ${beforePhotos.map(url => `<img src="${url}" class="photo" />`).join('')}
-              </div>
-            ` : ''}
-            ${afterPhotos?.length ? `
-              <h3>训练后</h3>
-              <div class="photo-grid">
-                ${afterPhotos.map(url => `<img src="${url}" class="photo" />`).join('')}
-              </div>
-            ` : ''}
+    // 训练记录（已简化为训练效果记录）
+    // SessionRecord 现在主要用于训练效果模块，不在此处显示
+    // 训练记录已整合到训练效果部分
+
+    // 初始体态照片
+    if (student.trainingPlan?.bodyInfo?.bodyPhotoBase64) {
+      html += `
+        <div class="section">
+          <h2>初始体态照片</h2>
+          <div style="text-align: center;">
+            <img src="${student.trainingPlan.bodyInfo.bodyPhotoBase64}" style="max-width: 100%; height: auto; border-radius: 8px; max-height: 400px;" />
           </div>
-        `
-      }
+        </div>
+      `
     }
 
     // 训练效果
     if (options.includeEffect && student.trainingEffect) {
-      const { summary, improvements, challenges, nextSteps } = student.trainingEffect
-      if (summary || improvements?.length || challenges?.length || nextSteps) {
+      const effect = student.trainingEffect
+      const records = Array.isArray(effect.records) ? effect.records : []
+      
+      if (records.length > 0 || effect.summary) {
+        const initialBodyInfo = student.trainingPlan?.bodyInfo || {}
+        const latestRecord = records.length > 0 ? records[records.length - 1] : null
+        
         html += `
           <div class="section">
             <h2>训练效果</h2>
-            ${summary ? `
-              <h3>总体评价</h3>
-              <p style="padding: 10px; background: #f8f9fa; border-radius: 6px;">${summary}</p>
-            ` : ''}
-            ${improvements?.length ? `
-              <h3>主要进步</h3>
-              ${improvements.map(i => `<div class="improvement">+ ${i}</div>`).join('')}
-            ` : ''}
-            ${challenges?.length ? `
-              <h3>待改进问题</h3>
-              ${challenges.map(c => `<div class="challenge">! ${c}</div>`).join('')}
-            ` : ''}
-            ${nextSteps ? `
-              <h3>下一步计划</h3>
-              <p style="padding: 10px; background: #f8f9fa; border-radius: 6px;">${nextSteps}</p>
-            ` : ''}
-          </div>
+        `
+        
+        // 身体数据对比
+        if (initialBodyInfo || latestRecord) {
+          html += `
+            <h3>身体数据对比</h3>
+            <div class="data-comparison">
+              <div class="comparison-item">
+                <div class="comparison-label">体重 (kg)</div>
+                <div class="comparison-row">
+                  <span>初始:</span>
+                  <span class="comparison-value">${initialBodyInfo.weight || '-'}</span>
+                </div>
+                <div class="comparison-row">
+                  <span>最新:</span>
+                  <span class="comparison-value">${latestRecord?.weight || '-'}</span>
+                </div>
+                ${latestRecord?.weight && initialBodyInfo.weight ? `
+                  <div class="comparison-row" style="border-bottom: none;">
+                    <span>变化:</span>
+                    <span class="comparison-change ${latestRecord.weight > initialBodyInfo.weight ? 'comparison-up' : 'comparison-down'}">
+                      ${latestRecord.weight > initialBodyInfo.weight ? '+' : ''}${(latestRecord.weight - initialBodyInfo.weight).toFixed(1)}
+                    </span>
+                  </div>
+                ` : ''}
+              </div>
+              
+              <div class="comparison-item">
+                <div class="comparison-label">体脂率 (%)</div>
+                <div class="comparison-row">
+                  <span>初始:</span>
+                  <span class="comparison-value">${initialBodyInfo.bodyFatPercentage || '-'}</span>
+                </div>
+                <div class="comparison-row">
+                  <span>最新:</span>
+                  <span class="comparison-value">${latestRecord?.bodyFatPercentage || '-'}</span>
+                </div>
+                ${latestRecord?.bodyFatPercentage && initialBodyInfo.bodyFatPercentage ? `
+                  <div class="comparison-row" style="border-bottom: none;">
+                    <span>变化:</span>
+                    <span class="comparison-change ${latestRecord.bodyFatPercentage < initialBodyInfo.bodyFatPercentage ? 'comparison-down' : 'comparison-up'}">
+                      ${latestRecord.bodyFatPercentage > initialBodyInfo.bodyFatPercentage ? '+' : ''}${(latestRecord.bodyFatPercentage - initialBodyInfo.bodyFatPercentage).toFixed(1)}
+                    </span>
+                  </div>
+                ` : ''}
+              </div>
+              
+              <div class="comparison-item">
+                <div class="comparison-label">骨骼肌率 (%)</div>
+                <div class="comparison-row">
+                  <span>初始:</span>
+                  <span class="comparison-value">${initialBodyInfo.skeletalMusclePercentage || '-'}</span>
+                </div>
+                <div class="comparison-row">
+                  <span>最新:</span>
+                  <span class="comparison-value">${latestRecord?.skeletalMusclePercentage || '-'}</span>
+                </div>
+                ${latestRecord?.skeletalMusclePercentage && initialBodyInfo.skeletalMusclePercentage ? `
+                  <div class="comparison-row" style="border-bottom: none;">
+                    <span>变化:</span>
+                    <span class="comparison-change ${latestRecord.skeletalMusclePercentage > initialBodyInfo.skeletalMusclePercentage ? 'comparison-up' : 'comparison-down'}">
+                      ${latestRecord.skeletalMusclePercentage > initialBodyInfo.skeletalMusclePercentage ? '+' : ''}${(latestRecord.skeletalMusclePercentage - initialBodyInfo.skeletalMusclePercentage).toFixed(1)}
+                    </span>
+                  </div>
+                ` : ''}
+              </div>
+            </div>
+          `
+        }
+        
+        // 训练效果记录
+        if (records.length > 0) {
+          html += `
+            <h3 style="margin-top: 20px;">训练效果记录</h3>
+            ${records.map(record => `
+              <div class="record">
+                <div class="record-header">
+                  <span class="record-lesson">${record.date} · 第 ${record.lessonNumber} 节课</span>
+                </div>
+                ${record.weight || record.bodyFatPercentage || record.skeletalMusclePercentage ? `
+                  <div style="padding: 8px 0; display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; font-size: 12px;">
+                    ${record.weight ? `<span>体重: <strong>${record.weight} kg</strong></span>` : ''}
+                    ${record.bodyFatPercentage ? `<span>体脂率: <strong>${record.bodyFatPercentage}%</strong></span>` : ''}
+                    ${record.skeletalMusclePercentage ? `<span>骨骼肌率: <strong>${record.skeletalMusclePercentage}%</strong></span>` : ''}
+                  </div>
+                ` : ''}
+                ${record.summary ? `<p style="margin-top: 8px; font-size: 13px;">${record.summary}</p>` : ''}
+              </div>
+            `).join('')}
+          `
+        }
+        
+        html += `
+            </div>
         `
       }
     }
 
     // 评分
     if (options.includeRatings && student.ratings) {
-      const { strength, endurance, flexibility, balance, coordination } = student.ratings
-      if (strength || endurance || flexibility || balance || coordination) {
+      const { trust, execution, cognition, learning, loyalty } = student.ratings
+      if (trust || execution || cognition || learning || loyalty) {
         html += `
           <div class="section">
-            <h2>能力评分</h2>
+            <h2>五维评分</h2>
             <div class="rating-grid">
               <div class="rating-item">
-                <div class="rating-value">${strength || '-'}</div>
-                <div class="rating-label">力量</div>
+                <div class="rating-value">${trust || '-'}</div>
+                <div class="rating-label">信任度</div>
               </div>
               <div class="rating-item">
-                <div class="rating-value">${endurance || '-'}</div>
-                <div class="rating-label">耐力</div>
+                <div class="rating-value">${execution || '-'}</div>
+                <div class="rating-label">执行力</div>
               </div>
               <div class="rating-item">
-                <div class="rating-value">${flexibility || '-'}</div>
-                <div class="rating-label">柔韧</div>
+                <div class="rating-value">${cognition || '-'}</div>
+                <div class="rating-label">认知度</div>
               </div>
               <div class="rating-item">
-                <div class="rating-value">${balance || '-'}</div>
-                <div class="rating-label">平衡</div>
+                <div class="rating-value">${learning || '-'}</div>
+                <div class="rating-label">学习力</div>
               </div>
               <div class="rating-item">
-                <div class="rating-value">${coordination || '-'}</div>
-                <div class="rating-label">协调</div>
+                <div class="rating-value">${loyalty || '-'}</div>
+                <div class="rating-label">忠诚度</div>
               </div>
             </div>
           </div>
