@@ -12,6 +12,14 @@ export interface RenewalRecord {
   confirmed: boolean
 }
 
+export interface RatingDimensions {
+  trust: number // 信任度
+  execution: number // 执行力
+  cognition: number // 认知水平
+  learning: number // 求知欲
+  loyalty: number // 粘性
+}
+
 export interface Student {
   id: string
   name: string
@@ -27,6 +35,8 @@ export interface Student {
   trainingPlanPdf?: string
   contractPdf?: string
   renewalHistory: RenewalRecord[]
+  ratings?: RatingDimensions // 五维评分
+  ratings_updated_at?: string
   createdAt: string
 }
 
@@ -54,4 +64,15 @@ export interface MonthlyStats {
   revenue: number
   profit: number
   completedSessions: number
+}
+
+// Utility types for progress color determination
+export type ProgressColorType = 'success' | 'warning' | 'destructive'
+
+export interface StudentProgressInfo {
+  remaining: number
+  completed: number
+  total: number
+  color: ProgressColorType
+  percentage: number
 }
