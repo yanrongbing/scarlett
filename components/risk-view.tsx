@@ -3,7 +3,7 @@
 import { useMemo } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { Bell, AlertCircle, CheckCircle, Wallet, User, RefreshCw, Star, Clock, FileText, VolumeX } from 'lucide-react'
+import { AlertCircle, CheckCircle, Wallet, User, RefreshCw, Star, Clock, FileText, VolumeX } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import type { Student, Session } from '@/lib/types'
@@ -59,15 +59,24 @@ export function RiskView({ students, sessions, getStudent, onRenewStudent, onSel
     })
   }, [students])
 
-  // 续课提醒（剩余课时 <= 4）
+  // 续课提醒（剩余课时 <= 4，排除已结课、已有续课计划的学员）
   const renewalReminders = useMemo(() => {
     return students.map(student => {
       const completed = sessions.filter(
         s => s.studentId === student.id && s.status === 'completed'
       ).length
       const remaining = student.totalSessions - completed
-      return { student, completed, remaining }
-    }).filter(item => item.remaining <= 4 && item.remaining >= 0)
+      // 检查是否有待确认的续课计划
+      const hasPendingRenewal = (student.renewalHistory || []).some(r => !r.confirmed)
+      return { student, completed, remaining, hasPendingRenewal }
+    }).filter(item => {
+      // 排除已结课学员
+      if (item.student.status === 'ended') return false
+      // 排除已有续课计划的学员
+      if (item.hasPendingRenewal) return false
+      // 只显示剩余课时 <= 4 的学员
+      return item.remaining <= 4 && item.remaining >= 0
+    })
       .sort((a, b) => a.remaining - b.remaining)
   }, [students, sessions])
 
@@ -165,12 +174,24 @@ export function RiskView({ students, sessions, getStudent, onRenewStudent, onSel
     return riskAnalysis.reduce((sum, r) => sum + r.refundReserve, 0)
   }, [riskAnalysis])
 
-  const highRiskCount = riskAnalysis.filter(r => r.riskLevel === 'high').length
+  // 剩余课时场地费：所有未结课学员（正在上课和暂停课程）剩余应支付的场地费
+  const totalRemainingVenueFee = useMemo(() => {
+    return students
+      .filter(s => s.status !== 'ended') // 排除已结课学员
+      .reduce((sum, student) => {
+        const completed = sessions.filter(
+          s => s.studentId === student.id && s.status === 'completed'
+        ).length
+        const remaining = student.totalSessions - completed
+        const venueFee = student.venueFee || 0
+        return sum + (remaining * venueFee)
+      }, 0)
+  }, [students, sessions])
 
   const getRiskIcon = (level: string) => {
     switch (level) {
       case 'high':
-        return <Bell className="w-3 h-3 text-destructive" />
+        return <AlertCircle className="w-3 h-3 text-destructive" />
       case 'medium':
         return <AlertCircle className="w-3 h-3 text-warning" />
       default:
@@ -196,35 +217,49 @@ export function RiskView({ students, sessions, getStudent, onRenewStudent, onSel
         <p className="text-sm text-muted-foreground">监控学员课时消耗与续课提醒</p>
       </div>
 
-      {/* Summary Cards - compact 3 columns */}
-      <div className="grid grid-cols-3 gap-2">
-        <Card className="bg-card border-border">
-          <CardContent className="p-2 md:p-3">
-            <div className="flex items-center justify-between mb-0.5">
-              <span className="text-xs text-muted-foreground">需关注</span>
-              <Bell className="w-3 h-3 text-destructive" />
+      {/* Summary Cards - 4 columns */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+        <Card className="bg-card border-border border-destructive/30">
+          <CardContent className="p-3 md:p-4">
+            <div className="flex items-center justify-between mb-1">
+              <span className="text-xs md:text-sm text-muted-foreground font-medium">需关注</span>
+              <VolumeX className="w-4 h-4 text-destructive" />
             </div>
-            <div className="text-base md:text-xl font-bold text-destructive">{highRiskCount}</div>
+            <div className="text-2xl md:text-3xl font-black text-destructive">{silentStudents.length}</div>
+            <p className="text-xs text-muted-foreground mt-0.5">静默学员</p>
+          </CardContent>
+        </Card>
+        
+        <Card className="bg-card border-border border-warning/30">
+          <CardContent className="p-3 md:p-4">
+            <div className="flex items-center justify-between mb-1">
+              <span className="text-xs md:text-sm text-muted-foreground font-medium">建议续课</span>
+              <RefreshCw className="w-4 h-4 text-warning" />
+            </div>
+            <div className="text-2xl md:text-3xl font-black text-warning">{renewalReminders.length}</div>
+            <p className="text-xs text-muted-foreground mt-0.5">待处理</p>
           </CardContent>
         </Card>
         
         <Card className="bg-card border-border">
-          <CardContent className="p-2 md:p-3">
-            <div className="flex items-center justify-between mb-0.5">
-              <span className="text-xs text-muted-foreground">建议续课</span>
-              <RefreshCw className="w-3 h-3 text-warning" />
+          <CardContent className="p-3 md:p-4">
+            <div className="flex items-center justify-between mb-1">
+              <span className="text-xs md:text-sm text-muted-foreground font-medium">预留退费</span>
+              <Wallet className="w-4 h-4 text-muted-foreground" />
             </div>
-            <div className="text-base md:text-xl font-bold text-warning">{renewalReminders.length}</div>
+            <div className="text-2xl md:text-3xl font-black text-foreground">¥{Math.round(totalRefundReserve).toLocaleString()}</div>
+            <p className="text-xs text-muted-foreground mt-0.5">建议预留</p>
           </CardContent>
         </Card>
-        
-        <Card className="bg-card border-border">
-          <CardContent className="p-2 md:p-3">
-            <div className="flex items-center justify-between mb-0.5">
-              <span className="text-xs text-muted-foreground">预留退费</span>
-              <Wallet className="w-3 h-3 text-muted-foreground" />
+
+        <Card className="bg-card border-border border-primary/30">
+          <CardContent className="p-3 md:p-4">
+            <div className="flex items-center justify-between mb-1">
+              <span className="text-xs md:text-sm text-muted-foreground font-medium">剩余场地费</span>
+              <Wallet className="w-4 h-4 text-primary" />
             </div>
-            <div className="text-base md:text-xl font-bold text-foreground">¥{Math.round(totalRefundReserve).toLocaleString()}</div>
+            <div className="text-2xl md:text-3xl font-black text-primary">¥{Math.round(totalRemainingVenueFee).toLocaleString()}</div>
+            <p className="text-xs text-muted-foreground mt-0.5">待支付</p>
           </CardContent>
         </Card>
       </div>
