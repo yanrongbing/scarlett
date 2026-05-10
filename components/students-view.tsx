@@ -502,18 +502,18 @@ export function StudentsView({
 
       {/* 暂停课程学员列表 */}
       {pausedStudents.length > 0 && (
-        <Card className="bg-card border-border border-muted-foreground/30">
+        <Card className="bg-card border-border border-primary/30">
           <CardContent className="p-0">
             <button
-              className="w-full flex items-center justify-between p-4 hover:bg-muted/50 transition-colors"
+              className="w-full flex items-center justify-between p-4 hover:bg-primary/5 transition-colors"
               onClick={() => setShowPausedList(!showPausedList)}
             >
               <div className="flex items-center gap-2">
-                <Pause className="w-4 h-4 text-muted-foreground" />
-                <span className="font-medium text-muted-foreground">暂停课程学员</span>
-                <span className="text-sm text-muted-foreground">({pausedStudents.length})</span>
+                <Pause className="w-4 h-4 text-primary" />
+                <span className="font-medium text-primary">暂停课程学员</span>
+                <span className="text-sm text-primary">({pausedStudents.length})</span>
               </div>
-              {showPausedList ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+              {showPausedList ? <ChevronDown className="w-4 h-4 text-primary" /> : <ChevronRight className="w-4 h-4 text-primary" />}
             </button>
             {showPausedList && (
               <div className="border-t border-border p-3 space-y-2">
@@ -546,18 +546,18 @@ export function StudentsView({
 
       {/* 已结课学员列表 */}
       {endedStudents.length > 0 && (
-        <Card className="bg-card border-border border-muted-foreground/30">
+        <Card className="bg-card border-border border-foreground/30">
           <CardContent className="p-0">
             <button
               className="w-full flex items-center justify-between p-4 hover:bg-muted/50 transition-colors"
               onClick={() => setShowEndedList(!showEndedList)}
             >
               <div className="flex items-center gap-2">
-                <CheckCircle className="w-4 h-4 text-muted-foreground" />
-                <span className="font-medium text-muted-foreground">已结课学员</span>
-                <span className="text-sm text-muted-foreground">({endedStudents.length})</span>
+                <CheckCircle className="w-4 h-4 text-foreground" />
+                <span className="font-medium text-foreground">已结课学员</span>
+                <span className="text-sm text-foreground">({endedStudents.length})</span>
               </div>
-              {showEndedList ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+              {showEndedList ? <ChevronDown className="w-4 h-4 text-foreground" /> : <ChevronRight className="w-4 h-4 text-foreground" />}
             </button>
             {showEndedList && (
               <div className="border-t border-border p-3 space-y-2">

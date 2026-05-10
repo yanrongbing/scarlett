@@ -167,7 +167,7 @@ export function useStore() {
     ))
   }, [])
 
-  // End course - mark student as ended (set totalSessions = completedSessions)
+  // End course - mark student as ended (only if remaining sessions = 0)
   const endCourse = useCallback((studentId: string) => {
     setStudents(prev => prev.map(s => {
       if (s.id !== studentId) return s
@@ -177,6 +177,10 @@ export function useStore() {
         session => session.studentId === studentId && session.status === 'completed'
       ).length
       
+      const remaining = s.totalSessions - completedCount
+      
+      // 如果有剩余课时，将totalSessions设为completedCount，使剩余课时为0
+      // 这样才能进入已结课列表
       return {
         ...s,
         totalSessions: completedCount, // Set total to completed, making remaining = 0
@@ -230,6 +234,19 @@ export function useStore() {
       createdAt: new Date().toISOString(),
     }
     setSessions(prev => [...prev, newSession])
+    
+    // 自动恢复暂停的学员：如果为暂停状态的学员排课，则自动恢复为active
+    setStudents(prev => prev.map(s => {
+      if (s.id === session.studentId && s.status === 'paused') {
+        return {
+          ...s,
+          status: 'active' as const,
+          pausedAt: undefined,
+        }
+      }
+      return s
+    }))
+    
     return newSession
   }, [])
 
