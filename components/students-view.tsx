@@ -245,11 +245,11 @@ export function StudentsView({
     const buttonClass = compact ? "h-6 text-xs px-2" : "h-7 text-xs px-2"
     
     return (
-      <div className={cn("flex gap-1", compact ? "flex-wrap" : "")}>
+      <div className={cn(compact ? "grid grid-cols-2 gap-1" : "flex gap-1")}>
         <Button
           size="sm"
           className={cn(
-            buttonClass,
+            buttonClass, "w-full",
             stats.needRenewal 
               ? "bg-success hover:bg-success/90 text-white animate-pulse" 
               : "bg-success hover:bg-success/90 text-white"
@@ -261,7 +261,7 @@ export function StudentsView({
         </Button>
         <Button
           size="sm"
-          className={cn(buttonClass, "bg-blue hover:bg-blue/90 text-white")}
+          className={cn(buttonClass, "w-full bg-blue hover:bg-blue/90 text-white")}
           onClick={(e) => { e.stopPropagation(); onPauseCourse?.(student.id) }}
         >
           <Pause className="w-3 h-3 mr-1" />
@@ -269,7 +269,7 @@ export function StudentsView({
         </Button>
         <Button
           size="sm"
-          className={cn(buttonClass, "bg-foreground hover:bg-foreground/90 text-background")}
+          className={cn(buttonClass, "w-full bg-foreground hover:bg-foreground/90 text-background")}
           onClick={(e) => { e.stopPropagation(); onEndCourse?.(student.id) }}
         >
           <CheckCircle className="w-3 h-3 mr-1" />
@@ -277,7 +277,7 @@ export function StudentsView({
         </Button>
         <Button
           size="sm"
-          className={cn(buttonClass, "bg-destructive hover:bg-destructive/90 text-white")}
+          className={cn(buttonClass, "w-full bg-destructive hover:bg-destructive/90 text-white")}
           onClick={(e) => { e.stopPropagation(); handleRefundStart(student) }}
         >
           <DollarSign className="w-3 h-3 mr-1" />
