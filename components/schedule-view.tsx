@@ -236,8 +236,15 @@ export function ScheduleView({
                         )}
                         onClick={() => canAddMore && handleSlotClick(dateStr, block.start)}
                       >
-                        <div className="space-y-1 h-full flex flex-col justify-between">
-                          <div>
+                        <div className={cn(
+                          "h-full gap-1",
+                          slotSessions.length > 0 ? "flex items-start" : ""
+                        )}>
+                          {/* 课程卡片：1节时占满，2节时横向各半 */}
+                          <div className={cn(
+                            "flex-1 min-w-0",
+                            slotSessions.length === 2 ? "grid grid-cols-2 gap-1" : "space-y-0"
+                          )}>
                             {slotSessions.map(session => {
                               const student = getStudent(session.studentId)
                               if (!student) return null
@@ -245,17 +252,17 @@ export function ScheduleView({
                                 <div
                                   key={session.id}
                                   className={cn(
-                                    "rounded p-1 text-xs relative",
-                                    session.status === 'completed' 
-                                      ? "bg-success/20 border border-success/30" 
+                                    "rounded p-1 text-xs",
+                                    session.status === 'completed'
+                                      ? "bg-success/20 border border-success/30"
                                       : "bg-primary/10 border border-primary/20"
                                   )}
                                   onClick={(e) => e.stopPropagation()}
                                 >
                                   <div className="flex items-start justify-between gap-0.5">
                                     <div className="flex-1 min-w-0">
-                                      <div className="font-medium truncate text-foreground text-xs">{student.name}</div>
-                                      <div className="text-muted-foreground text-xs">{session.time}</div>
+                                      <div className="font-medium truncate text-foreground text-xs leading-tight">{student.name}</div>
+                                      <div className="text-muted-foreground text-xs leading-tight">{session.time}</div>
                                       {session.location && (
                                         <div className="text-muted-foreground truncate text-xs flex items-center gap-0.5">
                                           <MapPin className="w-2.5 h-2.5 flex-shrink-0" />
@@ -275,7 +282,6 @@ export function ScheduleView({
                                       <X className="w-2.5 h-2.5" />
                                     </Button>
                                   </div>
-                                  
                                   <div className="mt-0.5 flex items-center gap-1">
                                     <Checkbox
                                       id={`session-${session.id}`}
@@ -283,7 +289,7 @@ export function ScheduleView({
                                       onCheckedChange={() => handleToggleComplete(session)}
                                       className="h-3 w-3 data-[state=checked]:bg-success data-[state=checked]:border-success"
                                     />
-                                    <label 
+                                    <label
                                       htmlFor={`session-${session.id}`}
                                       className={cn(
                                         "text-xs cursor-pointer",
@@ -297,21 +303,18 @@ export function ScheduleView({
                               )
                             })}
                           </div>
-                          {canAddMore && slotSessions.length > 0 && (
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              className="w-full h-auto py-1 text-xs gap-1 mt-1"
-                              onClick={() => handleSlotClick(dateStr, block.start)}
+                          {/* 有1节课时，在右侧显示轻盈的 + 按钮 */}
+                          {slotSessions.length === 1 && (
+                            <button
+                              className="flex-shrink-0 w-5 flex items-center justify-center text-muted-foreground/40 hover:text-primary transition-colors self-stretch"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                handleSlotClick(dateStr, block.start)
+                              }}
+                              title="添加第二节课"
                             >
-                              <Plus className="w-3 h-3" />
-                              添加课程
-                            </Button>
-                          )}
-                          {canAddMore && slotSessions.length === 0 && (
-                            <div className="text-xs text-muted-foreground text-center py-2 opacity-60">
-                              点击添加课程
-                            </div>
+                              <Plus className="w-3.5 h-3.5" />
+                            </button>
                           )}
                         </div>
                       </div>
