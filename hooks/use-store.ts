@@ -1,11 +1,41 @@
 'use client'
 
 import { useState, useEffect, useCallback, useRef } from 'react'
-import type { Student, Session, RenewalRecord, RatingDimensions } from '@/lib/types'
+import type { Student, Session, SessionRecord, RenewalRecord, RatingDimensions, TrainingPlan, StudentPhotos, TrainingEffect } from '@/lib/types'
 import { createClient } from '@/lib/supabase/client'
 
 const STUDENTS_KEY = 'coach-students'
 const SESSIONS_KEY = 'coach-sessions'
+const SESSION_RECORDS_KEY = 'coach-session-records'
+
+// 转换函数：SessionRecord
+function dbSessionRecordToApp(db: Record<string, unknown>): SessionRecord {
+  return {
+    id: db.id as string,
+    studentId: db.student_id as string,
+    lessonNumber: db.lesson_number as number,
+    date: db.date as string,
+    trainingItems: (db.training_items as SessionRecord['trainingItems']) || [],
+    overallStatus: db.overall_status as string || '',
+    statusNote: db.status_note as string || '',
+    coachMemo: db.coach_memo as string || '',
+    includeMemoInPdf: db.include_memo_in_pdf as boolean || false,
+  }
+}
+
+function appSessionRecordToDb(record: SessionRecord) {
+  return {
+    id: record.id,
+    student_id: record.studentId,
+    lesson_number: record.lessonNumber,
+    date: record.date || null,
+    training_items: record.trainingItems,
+    overall_status: record.overallStatus,
+    status_note: record.statusNote,
+    coach_memo: record.coachMemo,
+    include_memo_in_pdf: record.includeMemoInPdf,
+  }
+}
 
 // 转换函数：数据库格式 -> 应用格式
 function dbStudentToApp(db: Record<string, unknown>): Student {
@@ -32,6 +62,9 @@ function dbStudentToApp(db: Record<string, unknown>): Student {
     trainingPlanPdf: db.training_plan_pdf as string,
     contractPdf: db.contract_pdf as string,
     createdAt: db.created_at as string,
+    trainingPlan: db.training_plan as TrainingPlan || { phases: [], overallGoal: '' },
+    photos: db.photos as StudentPhotos || { beforePhotos: [], afterPhotos: [], progressPhotos: [] },
+    trainingEffect: db.training_effect as TrainingEffect || {},
   }
 }
 
@@ -71,6 +104,9 @@ function appStudentToDb(app: Student): Record<string, unknown> {
     renewal_history: app.renewalHistory || [],
     training_plan_pdf: app.trainingPlanPdf || null,
     contract_pdf: app.contractPdf || null,
+    training_plan: app.trainingPlan || {},
+    photos: app.photos || { beforePhotos: [], afterPhotos: [], progressPhotos: [] },
+    training_effect: app.trainingEffect || {},
   }
 }
 
@@ -89,6 +125,7 @@ function appSessionToDb(app: Session): Record<string, unknown> {
 export function useStore() {
   const [students, setStudents] = useState<Student[]>([])
   const [sessions, setSessions] = useState<Session[]>([])
+  const [sessionRecords, setSessionRecords] = useState<SessionRecord[]>([])
   const [isLoaded, setIsLoaded] = useState(false)
   const [syncStatus, setSyncStatus] = useState<'idle' | 'syncing' | 'error' | 'success'>('idle')
   const supabase = useRef(createClient()).current
@@ -97,18 +134,21 @@ export function useStore() {
   // 从Supabase加载数据
   const loadFromSupabase = useCallback(async () => {
     try {
-      const [studentsRes, sessionsRes] = await Promise.all([
+      const [studentsRes, sessionsRes, recordsRes] = await Promise.all([
         supabase.from('students').select('*').order('created_at', { ascending: true }),
         supabase.from('sessions').select('*').order('created_at', { ascending: true }),
+        supabase.from('session_records').select('*').order('lesson_number', { ascending: true }),
       ])
 
       if (studentsRes.error) throw studentsRes.error
       if (sessionsRes.error) throw sessionsRes.error
-
+      // session_records 表可能不存在，忽略错误
+      
       const loadedStudents = (studentsRes.data || []).map(dbStudentToApp)
       const loadedSessions = (sessionsRes.data || []).map(dbSessionToApp)
+      const loadedRecords = (recordsRes.data || []).map(dbSessionRecordToApp)
 
-      return { students: loadedStudents, sessions: loadedSessions }
+      return { students: loadedStudents, sessions: loadedSessions, sessionRecords: loadedRecords }
     } catch (error) {
       console.error('[v0] Failed to load from Supabase:', error)
       return null
@@ -181,14 +221,15 @@ export function useStore() {
       // 先尝试迁移本地数据
       await migrateLocalDataToSupabase()
 
-      // 从Supabase加载数据
-      const data = await loadFromSupabase()
-      if (data) {
-        setStudents(data.students)
-        setSessions(data.sessions)
-      }
-      setIsLoaded(true)
-    }
+  // 从Supabase加载数据
+  const data = await loadFromSupabase()
+  if (data) {
+  setStudents(data.students)
+  setSessions(data.sessions)
+  setSessionRecords(data.sessionRecords || [])
+  }
+  setIsLoaded(true)
+  }
     init()
   }, [loadFromSupabase, migrateLocalDataToSupabase])
 
@@ -650,9 +691,32 @@ export function useStore() {
     }, 0)
   }, [getCompletedSessions, getStudent])
 
+  // Session Records 相关
+  const getStudentSessionRecords = useCallback((studentId: string) => {
+    return sessionRecords.filter(r => r.studentId === studentId)
+  }, [sessionRecords])
+
+  const updateSessionRecord = useCallback(async (record: SessionRecord) => {
+    setSessionRecords(prev => {
+      const exists = prev.some(r => r.id === record.id)
+      if (exists) {
+        return prev.map(r => r.id === record.id ? record : r)
+      }
+      return [...prev, record]
+    })
+    // Sync to Supabase
+    await supabase.from('session_records').upsert(appSessionRecordToDb(record), { onConflict: 'id' })
+  }, [supabase])
+
+  const deleteSessionRecord = useCallback(async (recordId: string) => {
+    setSessionRecords(prev => prev.filter(r => r.id !== recordId))
+    await supabase.from('session_records').delete().eq('id', recordId)
+  }, [supabase])
+
   return {
     students,
     sessions,
+    sessionRecords,
     isLoaded,
     syncStatus,
     addStudent,
@@ -672,6 +736,9 @@ export function useStore() {
     getStudent,
     getStudentSessions,
     getSessionsInRange,
+    getStudentSessionRecords,
+    updateSessionRecord,
+    deleteSessionRecord,
     exportData,
     importData,
     getCompletedSessions,
