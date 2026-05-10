@@ -7,6 +7,7 @@ import { AlertCircle, CheckCircle, Wallet, User, RefreshCw, Star, Clock, FileTex
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import type { Student, Session } from '@/lib/types'
+import { calculateCompositeScore } from '@/lib/utils-helper'
 
 interface RiskViewProps {
   students: Student[]
@@ -206,7 +207,7 @@ export function RiskView({ students, sessions, getStudent, onRenewStudent, onSel
       case 'medium':
         return <Badge className="bg-warning text-warning-foreground text-sm font-semibold px-2 py-0.5">注意</Badge>
       default:
-        return <Badge className="bg-success text-success-foreground text-xs px-1.5 py-0">正常</Badge>
+        return <Badge className="bg-success text-success-foreground text-xs px-1.5 py-0">正��</Badge>
     }
   }
 
@@ -302,6 +303,17 @@ export function RiskView({ students, sessions, getStudent, onRenewStudent, onSel
                         续课
                       </Button>
                     )}
+                    {onPauseCourse && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-6 text-xs gap-1 px-2 border-primary/50 text-primary hover:bg-primary/10"
+                        onClick={() => onPauseCourse(student.id)}
+                      >
+                        <Clock className="w-3 h-3" />
+                        暂停
+                      </Button>
+                    )}
                     {onEndCourse && (
                       <Button
                         size="sm"
@@ -331,21 +343,43 @@ export function RiskView({ students, sessions, getStudent, onRenewStudent, onSel
         </CardHeader>
         <CardContent className="px-3 pb-3 md:px-4 md:pb-4 pt-0">
           {topStudents.length > 0 ? (
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-1.5">
-              {topStudents.map(({ student, count }) => (
-                <div 
-                  key={student!.id}
-                  className="flex items-center gap-1.5 p-1.5 rounded bg-muted/50 border border-border"
-                >
-                  <div className="w-5 h-5 rounded-full bg-primary/20 flex items-center justify-center flex-shrink-0">
-                    <User className="w-2.5 h-2.5 text-primary" />
+            <div className="space-y-2">
+              {topStudents.map(({ student, count }) => {
+                const compositeScore = calculateCompositeScore(student!.ratings)
+                return (
+                  <div 
+                    key={student!.id}
+                    className="p-3 rounded-lg bg-primary/5 border border-primary/20 cursor-pointer hover:bg-primary/10 transition-colors"
+                    onClick={() => onSelectStudent?.(student!)}
+                  >
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-2">
+                        <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center flex-shrink-0">
+                          <User className="w-4 h-4 text-primary" />
+                        </div>
+                        <span className="text-base font-bold text-foreground">{student!.name}</span>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <Badge className="bg-primary/20 text-primary border-primary/30">
+                          {count}节课
+                        </Badge>
+                        {compositeScore > 0 && (
+                          <div className="flex items-center gap-1">
+                            <span className="text-sm font-semibold">{compositeScore.toFixed(1)}</span>
+                            <Star className="w-4 h-4 fill-yellow-400 text-yellow-400" />
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                    {student!.trainingBackground && (
+                      <p className="text-xs text-muted-foreground line-clamp-2 pl-10">
+                        <span className="font-medium text-foreground">训练计划：</span>
+                        {student!.trainingBackground}
+                      </p>
+                    )}
                   </div>
-                  <div className="min-w-0 flex-1">
-                    <p className="text-xs font-medium text-foreground truncate">{student!.name}</p>
-                    <p className="text-xs text-muted-foreground">{count}次</p>
-                  </div>
-                </div>
-              ))}
+                )
+              })}
             </div>
           ) : (
             <p className="text-xs text-muted-foreground text-center py-3">近两周暂无上课记录</p>

@@ -45,6 +45,39 @@ function getMonthRange(date: Date) {
 }
 
 export function OverviewView({ students, sessions, getStudent, onSelectStudent, onTabChange }: OverviewViewProps) {
+  // 全局汇总数据
+  const globalStats = useMemo(() => {
+    // 总计学员数（排除已结课）
+    const totalStudents = students.filter(s => s.status !== 'ended').length
+    
+    // 总计利润（所有已完成课程的利润）
+    const completedSessions = sessions.filter(s => s.status === 'completed')
+    let totalProfit = 0
+    completedSessions.forEach(session => {
+      const student = getStudent(session.studentId)
+      if (student) {
+        totalProfit += student.sessionIncome || (student.sessionPrice - student.venueFee)
+      }
+    })
+    
+    // 总计课时（所有已完成课程数）
+    const totalSessions = completedSessions.length
+    
+    // 剩余课时数（所有未结课学员的剩余课时总和）
+    let remainingSessions = 0
+    students.filter(s => s.status !== 'ended').forEach(student => {
+      const completed = sessions.filter(
+        s => s.studentId === student.id && s.status === 'completed'
+      ).length
+      const remaining = student.totalSessions - completed
+      if (remaining > 0) {
+        remainingSessions += remaining
+      }
+    })
+    
+    return { totalStudents, totalProfit, totalSessions, remainingSessions }
+  }, [students, sessions, getStudent])
+
   // 本周数据
   const weekStats = useMemo(() => {
     const now = new Date()
@@ -226,6 +259,61 @@ export function OverviewView({ students, sessions, getStudent, onSelectStudent, 
       <div>
         <h1 className="text-3xl font-bold text-foreground">情况总览</h1>
         <p className="text-muted-foreground mt-1">姜贝果教练私教课情况</p>
+      </div>
+
+      {/* 全局汇总数据 - 4列布局 */}
+      <div className="grid gap-3 grid-cols-2 lg:grid-cols-4">
+        <Card className="bg-card border-border border-primary/30">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+              <Users className="w-4 h-4 text-primary" />
+              总计学员数
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-3xl font-black text-primary">{globalStats.totalStudents}</div>
+            <p className="text-xs text-muted-foreground mt-1">在训学员</p>
+          </CardContent>
+        </Card>
+
+        <Card className="bg-card border-border border-success/30">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+              <TrendingUp className="w-4 h-4 text-success" />
+              总计利润
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-3xl font-black text-success">¥{formatProfit(globalStats.totalProfit)}</div>
+            <p className="text-xs text-muted-foreground mt-1">累计收益</p>
+          </CardContent>
+        </Card>
+
+        <Card className="bg-card border-border">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+              <Target className="w-4 h-4 text-foreground" />
+              总计课时
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-3xl font-black text-foreground">{globalStats.totalSessions}</div>
+            <p className="text-xs text-muted-foreground mt-1">已完成课程</p>
+          </CardContent>
+        </Card>
+
+        <Card className="bg-card border-border border-warning/30">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+              <Clock className="w-4 h-4 text-warning" />
+              剩余课时
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-3xl font-black text-warning">{globalStats.remainingSessions}</div>
+            <p className="text-xs text-muted-foreground mt-1">待消耗</p>
+          </CardContent>
+        </Card>
       </div>
 
       {/* 本周数据和本月数据 - 3列布局 */}

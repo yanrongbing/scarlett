@@ -110,8 +110,8 @@ export function ScheduleView({
     return sessions.filter(s => s.date >= startDate && s.date <= endDate)
   }, [sessions, weekDates])
 
-  const getSessionForSlot = (date: string, startHour: number) => {
-    return weekSessions.find(s => {
+  const getSessionsForSlot = (date: string, startHour: number) => {
+    return weekSessions.filter(s => {
       const sessionHour = parseInt(s.time.split(':')[0])
       return s.date === date && sessionHour >= startHour && sessionHour < startHour + 2
     })
@@ -130,8 +130,9 @@ export function ScheduleView({
   }
 
   const handleSlotClick = (date: string, startHour: number) => {
-    const existingSession = getSessionForSlot(date, startHour)
-    if (!existingSession) {
+    const existingSessions = getSessionsForSlot(date, startHour)
+    // 允许每个2小时时间块最多排2节课
+    if (existingSessions.length < 2) {
       setSelectedSlot({ date, blockStart: startHour })
       setFormStudentId('')
       setFormTime(getTimeOptionsForBlock(startHour)[0] || '')
@@ -219,74 +220,82 @@ export function ScheduleView({
                   </div>
                   {weekDates.map((date, i) => {
                     const dateStr = formatDate(date)
-                    const session = getSessionForSlot(dateStr, block.start)
-                    const student = session ? getStudent(session.studentId) : null
+                    const slotSessions = getSessionsForSlot(dateStr, block.start)
                     const isToday = formatDate(date) === formatDate(new Date())
                     const isWeekend = i >= 5
+                    const canAddMore = slotSessions.length < 2
                     
                     return (
                       <div
                         key={i}
                         className={cn(
-                          "p-1.5 border-l border-border min-h-[70px] transition-colors",
+                          "p-1 border-l border-border min-h-[70px] transition-colors",
                           isToday && "bg-primary/5",
                           isWeekend && !isToday && "bg-muted/40",
-                          !session && "hover:bg-secondary cursor-pointer"
+                          canAddMore && "hover:bg-secondary cursor-pointer"
                         )}
-                        onClick={() => !session && handleSlotClick(dateStr, block.start)}
+                        onClick={() => canAddMore && handleSlotClick(dateStr, block.start)}
                       >
-                        {session && student && (
-                          <div
-                            className={cn(
-                              "h-full rounded p-1.5 text-xs relative",
-                              session.status === 'completed' 
-                                ? "bg-success/20 border border-success/30" 
-                                : "bg-primary/10 border border-primary/20"
-                            )}
-                          >
-                            <div className="flex items-start justify-between gap-0.5">
-                              <div className="flex-1 min-w-0">
-                                <div className="font-medium truncate text-foreground text-xs">{student.name}</div>
-                                <div className="text-muted-foreground text-xs">{session.time}</div>
-                                {session.location && (
-                                  <div className="text-muted-foreground truncate text-xs flex items-center gap-0.5">
-                                    <MapPin className="w-2.5 h-2.5 flex-shrink-0" />
-                                    <span className="truncate">{session.location}</span>
-                                  </div>
-                                )}
-                              </div>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-4 w-4 flex-shrink-0 text-muted-foreground hover:text-destructive"
-                                onClick={(e) => {
-                                  e.stopPropagation()
-                                  onDeleteSession(session.id)
-                                }}
-                              >
-                                <X className="w-2.5 h-2.5" />
-                              </Button>
-                            </div>
-                            
-                            <div className="mt-1 flex items-center gap-1">
-                              <Checkbox
-                                id={`session-${session.id}`}
-                                checked={session.status === 'completed'}
-                                onCheckedChange={() => handleToggleComplete(session)}
-                                className="h-3 w-3 data-[state=checked]:bg-success data-[state=checked]:border-success"
-                              />
-                              <label 
-                                htmlFor={`session-${session.id}`}
+                        <div className="space-y-1 h-full">
+                          {slotSessions.map(session => {
+                            const student = getStudent(session.studentId)
+                            if (!student) return null
+                            return (
+                              <div
+                                key={session.id}
                                 className={cn(
-                                  "text-xs cursor-pointer",
-                                  session.status === 'completed' ? "text-success" : "text-muted-foreground"
+                                  "rounded p-1 text-xs relative",
+                                  session.status === 'completed' 
+                                    ? "bg-success/20 border border-success/30" 
+                                    : "bg-primary/10 border border-primary/20"
                                 )}
+                                onClick={(e) => e.stopPropagation()}
                               >
-                                {session.status === 'completed' ? '完成' : '待完成'}
-                              </label>
-                            </div>
-                          </div>
-                        )}
+                                <div className="flex items-start justify-between gap-0.5">
+                                  <div className="flex-1 min-w-0">
+                                    <div className="font-medium truncate text-foreground text-xs">{student.name}</div>
+                                    <div className="text-muted-foreground text-xs">{session.time}</div>
+                                    {session.location && (
+                                      <div className="text-muted-foreground truncate text-xs flex items-center gap-0.5">
+                                        <MapPin className="w-2.5 h-2.5 flex-shrink-0" />
+                                        <span className="truncate">{session.location}</span>
+                                      </div>
+                                    )}
+                                  </div>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-4 w-4 flex-shrink-0 text-muted-foreground hover:text-destructive"
+                                    onClick={(e) => {
+                                      e.stopPropagation()
+                                      onDeleteSession(session.id)
+                                    }}
+                                  >
+                                    <X className="w-2.5 h-2.5" />
+                                  </Button>
+                                </div>
+                                
+                                <div className="mt-0.5 flex items-center gap-1">
+                                  <Checkbox
+                                    id={`session-${session.id}`}
+                                    checked={session.status === 'completed'}
+                                    onCheckedChange={() => handleToggleComplete(session)}
+                                    className="h-3 w-3 data-[state=checked]:bg-success data-[state=checked]:border-success"
+                                  />
+                                  <label 
+                                    htmlFor={`session-${session.id}`}
+                                    className={cn(
+                                      "text-xs cursor-pointer",
+                                      session.status === 'completed' ? "text-success" : "text-muted-foreground"
+                                    )}
+                                  >
+                                    {session.status === 'completed' ? '完成' : '待'}
+                                  </label>
+                                </div>
+                              </div>
+                            )
+                          })}
+                        </div>
                       </div>
                     )
                   })}
