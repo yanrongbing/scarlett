@@ -19,7 +19,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Checkbox } from '@/components/ui/checkbox'
-import { ChevronLeft, ChevronRight, Clock, MapPin, X } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Clock, MapPin, X, Plus } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { Student, Session } from '@/lib/types'
 
@@ -236,65 +236,86 @@ export function ScheduleView({
                         )}
                         onClick={() => canAddMore && handleSlotClick(dateStr, block.start)}
                       >
-                        <div className="space-y-1 h-full">
-                          {slotSessions.map(session => {
-                            const student = getStudent(session.studentId)
-                            if (!student) return null
-                            return (
-                              <div
-                                key={session.id}
-                                className={cn(
-                                  "rounded p-1 text-xs relative",
-                                  session.status === 'completed' 
-                                    ? "bg-success/20 border border-success/30" 
-                                    : "bg-primary/10 border border-primary/20"
-                                )}
-                                onClick={(e) => e.stopPropagation()}
-                              >
-                                <div className="flex items-start justify-between gap-0.5">
-                                  <div className="flex-1 min-w-0">
-                                    <div className="font-medium truncate text-foreground text-xs">{student.name}</div>
-                                    <div className="text-muted-foreground text-xs">{session.time}</div>
-                                    {session.location && (
-                                      <div className="text-muted-foreground truncate text-xs flex items-center gap-0.5">
-                                        <MapPin className="w-2.5 h-2.5 flex-shrink-0" />
-                                        <span className="truncate">{session.location}</span>
-                                      </div>
-                                    )}
+                        <div className={cn(
+                          "h-full gap-1",
+                          slotSessions.length > 0 ? "flex items-start" : ""
+                        )}>
+                          {/* 课程卡片：1节时占满，2节时横向各半 */}
+                          <div className={cn(
+                            "flex-1 min-w-0",
+                            slotSessions.length === 2 ? "grid grid-cols-2 gap-1" : "space-y-0"
+                          )}>
+                            {slotSessions.map(session => {
+                              const student = getStudent(session.studentId)
+                              if (!student) return null
+                              return (
+                                <div
+                                  key={session.id}
+                                  className={cn(
+                                    "rounded p-1 text-xs",
+                                    session.status === 'completed'
+                                      ? "bg-success/20 border border-success/30"
+                                      : "bg-primary/10 border border-primary/20"
+                                  )}
+                                  onClick={(e) => e.stopPropagation()}
+                                >
+                                  <div className="flex items-start justify-between gap-0.5">
+                                    <div className="flex-1 min-w-0">
+                                      <div className="font-medium truncate text-foreground text-xs leading-tight">{student.name}</div>
+                                      <div className="text-muted-foreground text-xs leading-tight">{session.time}</div>
+                                      {session.location && (
+                                        <div className="text-muted-foreground truncate text-xs flex items-center gap-0.5">
+                                          <MapPin className="w-2.5 h-2.5 flex-shrink-0" />
+                                          <span className="truncate">{session.location}</span>
+                                        </div>
+                                      )}
+                                    </div>
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      className="h-4 w-4 flex-shrink-0 text-muted-foreground hover:text-destructive"
+                                      onClick={(e) => {
+                                        e.stopPropagation()
+                                        onDeleteSession(session.id)
+                                      }}
+                                    >
+                                      <X className="w-2.5 h-2.5" />
+                                    </Button>
                                   </div>
-                                  <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    className="h-4 w-4 flex-shrink-0 text-muted-foreground hover:text-destructive"
-                                    onClick={(e) => {
-                                      e.stopPropagation()
-                                      onDeleteSession(session.id)
-                                    }}
-                                  >
-                                    <X className="w-2.5 h-2.5" />
-                                  </Button>
+                                  <div className="mt-0.5 flex items-center gap-1">
+                                    <Checkbox
+                                      id={`session-${session.id}`}
+                                      checked={session.status === 'completed'}
+                                      onCheckedChange={() => handleToggleComplete(session)}
+                                      className="h-3 w-3 data-[state=checked]:bg-success data-[state=checked]:border-success"
+                                    />
+                                    <label
+                                      htmlFor={`session-${session.id}`}
+                                      className={cn(
+                                        "text-xs cursor-pointer",
+                                        session.status === 'completed' ? "text-success" : "text-muted-foreground"
+                                      )}
+                                    >
+                                      {session.status === 'completed' ? '完成' : '待上课'}
+                                    </label>
+                                  </div>
                                 </div>
-                                
-                                <div className="mt-0.5 flex items-center gap-1">
-                                  <Checkbox
-                                    id={`session-${session.id}`}
-                                    checked={session.status === 'completed'}
-                                    onCheckedChange={() => handleToggleComplete(session)}
-                                    className="h-3 w-3 data-[state=checked]:bg-success data-[state=checked]:border-success"
-                                  />
-                                  <label 
-                                    htmlFor={`session-${session.id}`}
-                                    className={cn(
-                                      "text-xs cursor-pointer",
-                                      session.status === 'completed' ? "text-success" : "text-muted-foreground"
-                                    )}
-                                  >
-                                    {session.status === 'completed' ? '完成' : '待上课'}
-                                  </label>
-                                </div>
-                              </div>
-                            )
-                          })}
+                              )
+                            })}
+                          </div>
+                          {/* 有1节课时，在右侧显示轻盈的 + 按钮 */}
+                          {slotSessions.length === 1 && (
+                            <button
+                              className="flex-shrink-0 w-5 flex items-center justify-center text-muted-foreground/40 hover:text-primary transition-colors self-stretch"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                handleSlotClick(dateStr, block.start)
+                              }}
+                              title="添加第二节课"
+                            >
+                              <Plus className="w-3.5 h-3.5" />
+                            </button>
+                          )}
                         </div>
                       </div>
                     )
