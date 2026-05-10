@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { Star, ArrowLeft, Upload, FileText, Eye, X, RefreshCw, Pause, CheckCircle, DollarSign, XCircle, ClipboardList, BookOpen, TrendingUp, FileDown, User } from 'lucide-react'
+import { Star, ArrowLeft, Upload, FileText, Eye, X, RefreshCw, Pause, CheckCircle, DollarSign, XCircle, ClipboardList, BookOpen, TrendingUp, FileDown, User, Trash2 } from 'lucide-react'
 import { Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, ResponsiveContainer } from 'recharts'
 import type { Student, Session, SessionRecord, RatingDimensions } from '@/lib/types'
 import { getStudentProgress, calculateCompositeScore, formatProfit } from '@/lib/utils-helper'
@@ -29,6 +29,7 @@ interface StudentDetailProps {
   onPauseCourse?: (studentId: string) => void
   onEndCourse?: (studentId: string) => void
   onRefundCourse?: (studentId: string, refundAmount: number) => void
+  onDeleteStudent?: (studentId: string) => void
 }
 
 export function StudentDetail({
@@ -44,6 +45,7 @@ export function StudentDetail({
   onPauseCourse,
   onEndCourse,
   onRefundCourse,
+  onDeleteStudent,
 }: StudentDetailProps) {
   const [activeTab, setActiveTab] = useState('info')
   const [isEditingRatings, setIsEditingRatings] = useState(false)
@@ -60,6 +62,8 @@ export function StudentDetail({
   const [showRefundDialog, setShowRefundDialog] = useState(false)
   const [refundAmount, setRefundAmount] = useState('')
   const [refundConfirm, setRefundConfirm] = useState(false)
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false)
+  const [deleteConfirmName, setDeleteConfirmName] = useState('')
   const trainingPlanInputRef = useRef<HTMLInputElement>(null)
   const contractInputRef = useRef<HTMLInputElement>(null)
 
@@ -130,6 +134,16 @@ export function StudentDetail({
 
   const needRenewal = progress.remaining <= 4 && progress.remaining >= 0
 
+  const handleDeleteStudent = () => {
+    if (!student || !onDeleteStudent) return
+    if (deleteConfirmName !== student.name) return
+    
+    onDeleteStudent(student.id)
+    setShowDeleteDialog(false)
+    setDeleteConfirmName('')
+    onBack()
+  }
+
   return (
     <div className="min-h-screen bg-background pb-20">
       {/* 顶部导航 */}
@@ -153,6 +167,16 @@ export function StudentDetail({
             <Button variant="outline" size="sm" onClick={onEdit}>
               编辑
             </Button>
+            {onDeleteStudent && (
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={() => setShowDeleteDialog(true)}
+                className="text-destructive hover:text-destructive"
+              >
+                <Trash2 className="w-4 h-4" />
+              </Button>
+            )}
           </div>
         </div>
 
@@ -624,6 +648,57 @@ export function StudentDetail({
                   </div>
                 </>
               )}
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* 删除学员确认弹窗 */}
+      {showDeleteDialog && (
+        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
+          <Card className="w-full max-w-md">
+            <CardContent className="p-6 space-y-4">
+              <div className="flex items-center gap-2">
+                <Trash2 className="w-5 h-5 text-destructive" />
+                <h3 className="text-lg font-semibold">删除学员档案</h3>
+              </div>
+              
+              <div className="p-4 bg-destructive/10 rounded-md space-y-2">
+                <p className="text-sm font-medium text-destructive">此操作不可撤销！</p>
+                <p className="text-sm">将永久删除 <strong>{student.name}</strong> 的全部档案，包括：</p>
+                <ul className="text-sm list-disc list-inside text-muted-foreground space-y-1">
+                  <li>基本信息和评分</li>
+                  <li>训练计划和训练记录</li>
+                  <li>训练效果记录</li>
+                  <li>所有课程记录</li>
+                  <li>相关收入和利润统计</li>
+                </ul>
+              </div>
+              
+              <div className="space-y-2">
+                <Label>请输入学员姓名 <strong>{student.name}</strong> 以确认删除：</Label>
+                <Input
+                  placeholder="输入学员姓名确认"
+                  value={deleteConfirmName}
+                  onChange={(e) => setDeleteConfirmName(e.target.value)}
+                />
+              </div>
+              
+              <div className="flex gap-2 justify-end">
+                <Button variant="outline" onClick={() => {
+                  setShowDeleteDialog(false)
+                  setDeleteConfirmName('')
+                }}>
+                  取消
+                </Button>
+                <Button 
+                  variant="destructive"
+                  onClick={handleDeleteStudent}
+                  disabled={deleteConfirmName !== student.name}
+                >
+                  确认删除
+                </Button>
+              </div>
             </CardContent>
           </Card>
         </div>
