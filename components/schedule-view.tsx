@@ -289,7 +289,7 @@ export function ScheduleView({
                                       session.status === 'completed' ? "text-success" : "text-muted-foreground"
                                     )}
                                   >
-                                    {session.status === 'completed' ? '完成' : '待'}
+                                    {session.status === 'completed' ? '完成' : '待上课'}
                                   </label>
                                 </div>
                               </div>

@@ -1,6 +1,6 @@
 'use client'
 
-import type { Student, ProgressColorType, RatingDimensions } from '@/lib/types'
+import type { Student, Session, ProgressColorType, RatingDimensions } from '@/lib/types'
 
 /**
  * 根据剩余课时数判断进度条颜色
@@ -16,17 +16,25 @@ export function getProgressColor(remaining: number): ProgressColorType {
 
 /**
  * 获取学员进度信息
+ * @param student 学员信息
+ * @param sessions 可选的课程列表，如果提供则从中计算已完成课程数，否则使用student.completedSessions
  */
-export function getStudentProgress(student: Student) {
-  const remaining = Math.max(0, student.totalSessions - student.completedSessions)
-  const percentage = student.totalSessions > 0 
-    ? Math.round((student.completedSessions / student.totalSessions) * 100)
+export function getStudentProgress(student: Student, sessions?: Session[]) {
+  // 如果提供了sessions，从中计算已完成课程数
+  const completed = sessions 
+    ? sessions.filter(s => s.studentId === student.id && s.status === 'completed').length
+    : (student.completedSessions || 0)
+  
+  const total = student.totalSessions || 0
+  const remaining = Math.max(0, total - completed)
+  const percentage = total > 0 
+    ? Math.round((completed / total) * 100)
     : 0
   
   return {
     remaining,
-    completed: student.completedSessions,
-    total: student.totalSessions,
+    completed,
+    total,
     color: getProgressColor(remaining),
     percentage,
   }
