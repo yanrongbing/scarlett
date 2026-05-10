@@ -181,9 +181,46 @@ export function useStore() {
         ...s,
         totalSessions: completedCount, // Set total to completed, making remaining = 0
         completedSessions: completedCount,
+        status: 'ended' as const,
+        endedAt: new Date().toISOString(),
       }
     }))
   }, [sessions])
+
+  // Pause course - mark student as paused for 30 days
+  const pauseCourse = useCallback((studentId: string) => {
+    setStudents(prev => prev.map(s => {
+      if (s.id !== studentId) return s
+      return {
+        ...s,
+        status: 'paused' as const,
+        pausedAt: new Date().toISOString(),
+      }
+    }))
+  }, [])
+
+  // Restart course - reactivate ended student with new sessions
+  const restartCourse = useCallback((studentId: string, addedSessions: number, addedFee: number, addedVenueFee: number) => {
+    setStudents(prev => prev.map(s => {
+      if (s.id !== studentId) return s
+      
+      const newTotalSessions = s.totalSessions + addedSessions
+      const newTotalFee = s.totalFee + addedFee
+      const newSessionPrice = newTotalSessions > 0 ? newTotalFee / newTotalSessions : 0
+      
+      return {
+        ...s,
+        totalSessions: newTotalSessions,
+        totalFee: newTotalFee,
+        sessionPrice: newSessionPrice,
+        venueFee: addedVenueFee || s.venueFee,
+        sessionIncome: newSessionPrice - (addedVenueFee || s.venueFee),
+        status: 'active' as const,
+        endedAt: undefined,
+        pausedAt: undefined,
+      }
+    }))
+  }, [])
 
   // Session operations
   const addSession = useCallback((session: Omit<Session, 'id' | 'createdAt'>) => {
@@ -292,6 +329,8 @@ export function useStore() {
     deleteRenewal,
     updateStudentRatings,
     endCourse,
+    pauseCourse,
+    restartCourse,
     addSession,
     updateSession,
     deleteSession,

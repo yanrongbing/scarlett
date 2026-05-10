@@ -8,7 +8,7 @@ import { Progress } from '@/components/ui/progress'
 import { Checkbox } from '@/components/ui/checkbox'
 import { StudentForm } from './student-form'
 import { RenewalForm } from './renewal-form'
-import { Plus, Edit2, Trash2, User, RefreshCw, FileText, AlertCircle, LayoutGrid, List, CheckCircle, Star } from 'lucide-react'
+import { Plus, Edit2, Trash2, User, RefreshCw, FileText, AlertCircle, LayoutGrid, List, CheckCircle, Star, ChevronDown, ChevronRight, Play, Pause } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { getStudentProgress, formatProfit, calculateCompositeScore } from '@/lib/utils-helper'
 import type { Student, Session } from '@/lib/types'
@@ -23,6 +23,7 @@ interface StudentsViewProps {
   onConfirmRenewal: (studentId: string, renewalId: string) => void
   onDeleteRenewal: (studentId: string, renewalId: string) => void
   onSelectStudent?: (student: Student) => void
+  onRestartCourse?: (studentId: string, addedSessions: number, addedFee: number, addedVenueFee: number) => void
 }
 
 const courseTypeLabels: Record<string, string> = {
@@ -52,12 +53,17 @@ export function StudentsView({
   onConfirmRenewal,
   onDeleteRenewal,
   onSelectStudent,
+  onRestartCourse,
 }: StudentsViewProps) {
   const [isFormOpen, setIsFormOpen] = useState(false)
   const [isRenewalOpen, setIsRenewalOpen] = useState(false)
   const [editingStudent, setEditingStudent] = useState<Student | undefined>()
   const [renewingStudent, setRenewingStudent] = useState<Student | null>(null)
   const [viewMode, setViewMode] = useState<'list' | 'card'>('list')
+  const [showEndedList, setShowEndedList] = useState(false)
+  const [showPausedList, setShowPausedList] = useState(false)
+  const [restartingStudent, setRestartingStudent] = useState<Student | null>(null)
+  const [restartForm, setRestartForm] = useState({ sessions: '', fee: '', venueFee: '' })
 
   const handleEdit = (student: Student) => {
     setEditingStudent(student)
@@ -112,6 +118,23 @@ export function StudentsView({
     }
   }
 
+  // 分类学员
+  const activeStudents = students.filter(s => s.status !== 'ended' && s.status !== 'paused')
+  const pausedStudents = students.filter(s => s.status === 'paused')
+  const endedStudents = students.filter(s => s.status === 'ended')
+
+  const handleRestartSubmit = () => {
+    if (!restartingStudent || !onRestartCourse) return
+    const addedSessions = parseInt(restartForm.sessions) || 0
+    const addedFee = parseFloat(restartForm.fee) || 0
+    const addedVenueFee = parseFloat(restartForm.venueFee) || 0
+    if (addedSessions > 0 && addedFee > 0) {
+      onRestartCourse(restartingStudent.id, addedSessions, addedFee, addedVenueFee)
+      setRestartingStudent(null)
+      setRestartForm({ sessions: '', fee: '', venueFee: '' })
+    }
+  }
+
   return (
     <div className="space-y-4 md:space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
@@ -146,7 +169,7 @@ export function StudentsView({
         </div>
       </div>
 
-      {students.length === 0 ? (
+      {activeStudents.length === 0 && pausedStudents.length === 0 && endedStudents.length === 0 ? (
         <Card className="bg-card border-border">
           <CardContent className="flex flex-col items-center justify-center py-8">
             <User className="w-10 h-10 text-muted-foreground mb-3" />
@@ -160,18 +183,18 @@ export function StudentsView({
               <table className="w-full min-w-[640px]">
                 <thead>
                   <tr className="border-b border-border bg-muted/30">
-                    <th className="px-3 py-2 text-left text-xs font-medium text-muted-foreground">学员</th>
-                    <th className="px-3 py-2 text-center text-xs font-medium text-muted-foreground">类型</th>
-                    <th className="px-3 py-2 text-center text-xs font-medium text-muted-foreground">来源</th>
-                    <th className="px-3 py-2 text-center text-xs font-medium text-muted-foreground">课时</th>
-                    <th className="px-3 py-2 text-center text-xs font-medium text-muted-foreground">进度</th>
-                    <th className="px-3 py-2 text-center text-xs font-medium text-muted-foreground">评分</th>
-                    <th className="px-3 py-2 text-right text-xs font-medium text-muted-foreground">利润</th>
-                    <th className="px-3 py-2 text-center text-xs font-medium text-muted-foreground">操作</th>
+                    <th className="px-4 py-3 text-left text-sm font-medium text-muted-foreground">学员</th>
+                    <th className="px-4 py-3 text-center text-sm font-medium text-muted-foreground">类型</th>
+                    <th className="px-4 py-3 text-center text-sm font-medium text-muted-foreground">来源</th>
+                    <th className="px-4 py-3 text-center text-sm font-medium text-muted-foreground">课时</th>
+                    <th className="px-4 py-3 text-center text-sm font-medium text-muted-foreground">进度</th>
+                    <th className="px-4 py-3 text-center text-sm font-medium text-muted-foreground">评分</th>
+                    <th className="px-4 py-3 text-right text-sm font-medium text-muted-foreground">利润</th>
+                    <th className="px-4 py-3 text-center text-sm font-medium text-muted-foreground">操作</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {students.map(student => {
+                  {activeStudents.map(student => {
                     const stats = getStudentStats(student)
                     const courseType = student.courseType || 'offline'
                     return (
@@ -183,28 +206,28 @@ export function StudentsView({
                           )}
                           onClick={() => onSelectStudent?.(student)}
                         >
-                          <td className="px-3 py-2">
+                          <td className="px-4 py-3">
                             <div className="flex items-center gap-2">
                               {stats.showRenewal && (
-                                <AlertCircle className="w-3 h-3 text-warning flex-shrink-0" />
+                                <AlertCircle className="w-4 h-4 text-warning flex-shrink-0" />
                               )}
-                              <span className="text-sm font-medium text-foreground">{student.name}</span>
+                              <span className="text-base font-medium text-foreground">{student.name}</span>
                             </div>
                           </td>
-                          <td className="px-3 py-2 text-center">
-                            <Badge className={cn("text-xs border", courseTypeColors[courseType])} variant="secondary">
+                          <td className="px-4 py-3 text-center">
+                            <Badge className={cn("text-sm border", courseTypeColors[courseType])} variant="secondary">
                               {courseTypeLabels[courseType]}
                             </Badge>
                           </td>
-                          <td className="px-3 py-2 text-center">
-                            <span className="text-xs text-muted-foreground">{sourceLabels[student.source] || '其他'}</span>
+                          <td className="px-4 py-3 text-center">
+                            <span className="text-sm text-muted-foreground">{sourceLabels[student.source] || '其他'}</span>
                           </td>
-                          <td className="px-3 py-2 text-center">
-                            <span className="text-xs text-foreground">{stats.completedSessions}/{student.totalSessions}</span>
+                          <td className="px-4 py-3 text-center">
+                            <span className="text-sm text-foreground">{stats.completedSessions}/{student.totalSessions}</span>
                           </td>
-                          <td className="px-3 py-2 text-center">
-                            <div className="flex items-center gap-1 justify-center">
-                              <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden">
+                          <td className="px-4 py-3 text-center">
+                            <div className="flex items-center gap-2 justify-center">
+                              <div className="flex-1 h-2 bg-muted rounded-full overflow-hidden max-w-20">
                                 <div 
                                   className={cn(
                                     "h-full transition-all",
@@ -215,19 +238,19 @@ export function StudentsView({
                                   style={{ width: `${Math.min(stats.progress, 100)}%` }}
                                 />
                               </div>
-                              <span className="text-xs text-muted-foreground min-w-5 text-right">{stats.remainingSessions}</span>
+                              <span className="text-sm text-muted-foreground min-w-6 text-right">{stats.remainingSessions}</span>
                             </div>
                           </td>
-                          <td className="px-3 py-2 text-center">
+                          <td className="px-4 py-3 text-center">
                             {stats.compositeScore > 0 && (
                               <div className="flex items-center justify-center gap-1">
-                                <span className="text-xs font-medium">{stats.compositeScore.toFixed(1)}</span>
-                                <Star className="w-3 h-3 fill-yellow-400 text-yellow-400" />
+                                <span className="text-sm font-medium">{stats.compositeScore.toFixed(1)}</span>
+                                <Star className="w-4 h-4 fill-yellow-400 text-yellow-400" />
                               </div>
                             )}
                           </td>
-                          <td className="px-3 py-2 text-right">
-                            <span className="text-xs font-medium">¥{formatProfit(stats.profit)}</span>
+                          <td className="px-4 py-3 text-right">
+                            <span className="text-sm font-medium text-success">¥{formatProfit(stats.profit)}</span>
                           </td>
                           <td className="px-3 py-2">
                             <div className="flex items-center justify-center gap-1" onClick={e => e.stopPropagation()}>
@@ -331,14 +354,18 @@ export function StudentsView({
         </Card>
       ) : (
         <div className="grid gap-3 grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-          {students.map(student => {
+          {activeStudents.map(student => {
             const stats = getStudentStats(student)
             const courseType = student.courseType || 'offline'
             return (
-              <Card key={student.id} className={cn(
-                "bg-card border-border transition-shadow hover:shadow-md",
-                stats.showRenewal && "border-warning/50"
-              )}>
+              <Card 
+                key={student.id} 
+                className={cn(
+                  "bg-card border-border transition-shadow hover:shadow-md cursor-pointer",
+                  stats.showRenewal && "border-warning/50"
+                )}
+                onClick={() => onSelectStudent?.(student)}
+              >
                 <CardContent className="p-3">
                   <div className="flex items-start justify-between mb-2">
                     <div className="min-w-0 flex-1">
@@ -470,6 +497,149 @@ export function StudentsView({
               </Card>
             )
           })}
+        </div>
+      )}
+
+      {/* 暂停课程学员列表 */}
+      {pausedStudents.length > 0 && (
+        <Card className="bg-card border-border border-muted-foreground/30">
+          <CardContent className="p-0">
+            <button
+              className="w-full flex items-center justify-between p-4 hover:bg-muted/50 transition-colors"
+              onClick={() => setShowPausedList(!showPausedList)}
+            >
+              <div className="flex items-center gap-2">
+                <Pause className="w-4 h-4 text-muted-foreground" />
+                <span className="font-medium text-muted-foreground">暂停课程学员</span>
+                <span className="text-sm text-muted-foreground">({pausedStudents.length})</span>
+              </div>
+              {showPausedList ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+            </button>
+            {showPausedList && (
+              <div className="border-t border-border p-3 space-y-2">
+                {pausedStudents.map(student => (
+                  <div key={student.id} className="flex items-center justify-between p-2 bg-muted/30 rounded">
+                    <div className="flex items-center gap-2">
+                      <User className="w-4 h-4 text-muted-foreground" />
+                      <span className="text-sm font-medium">{student.name}</span>
+                      {student.pausedAt && (
+                        <span className="text-xs text-muted-foreground">
+                          暂停于 {new Date(student.pausedAt).toLocaleDateString('zh-CN')}
+                        </span>
+                      )}
+                    </div>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="h-7 text-xs"
+                      onClick={() => onUpdateStudent(student.id, { status: 'active', pausedAt: undefined })}
+                    >
+                      恢复课程
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* 已结课学员列表 */}
+      {endedStudents.length > 0 && (
+        <Card className="bg-card border-border border-muted-foreground/30">
+          <CardContent className="p-0">
+            <button
+              className="w-full flex items-center justify-between p-4 hover:bg-muted/50 transition-colors"
+              onClick={() => setShowEndedList(!showEndedList)}
+            >
+              <div className="flex items-center gap-2">
+                <CheckCircle className="w-4 h-4 text-muted-foreground" />
+                <span className="font-medium text-muted-foreground">已结课学员</span>
+                <span className="text-sm text-muted-foreground">({endedStudents.length})</span>
+              </div>
+              {showEndedList ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+            </button>
+            {showEndedList && (
+              <div className="border-t border-border p-3 space-y-2">
+                {endedStudents.map(student => (
+                  <div key={student.id} className="flex items-center justify-between p-2 bg-muted/30 rounded">
+                    <div className="flex items-center gap-2">
+                      <User className="w-4 h-4 text-muted-foreground" />
+                      <span className="text-sm font-medium">{student.name}</span>
+                      {student.endedAt && (
+                        <span className="text-xs text-muted-foreground">
+                          结课于 {new Date(student.endedAt).toLocaleDateString('zh-CN')}
+                        </span>
+                      )}
+                    </div>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="h-7 text-xs gap-1"
+                      onClick={() => setRestartingStudent(student)}
+                    >
+                      <Play className="w-3 h-3" />
+                      重启课程
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* 重启课程弹窗 */}
+      {restartingStudent && (
+        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
+          <Card className="w-full max-w-md">
+            <CardContent className="p-6 space-y-4">
+              <h3 className="text-lg font-semibold">重启课程 - {restartingStudent.name}</h3>
+              <div className="space-y-3">
+                <div className="space-y-1">
+                  <label className="text-sm font-medium">新增课时数</label>
+                  <input
+                    type="number"
+                    className="w-full px-3 py-2 border border-border rounded-md bg-background"
+                    placeholder="输入课时数"
+                    value={restartForm.sessions}
+                    onChange={(e) => setRestartForm(prev => ({ ...prev, sessions: e.target.value }))}
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-sm font-medium">课程费用 (¥)</label>
+                  <input
+                    type="number"
+                    className="w-full px-3 py-2 border border-border rounded-md bg-background"
+                    placeholder="输入总费用"
+                    value={restartForm.fee}
+                    onChange={(e) => setRestartForm(prev => ({ ...prev, fee: e.target.value }))}
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-sm font-medium">场地费/节 (¥)</label>
+                  <input
+                    type="number"
+                    className="w-full px-3 py-2 border border-border rounded-md bg-background"
+                    placeholder="输入场地费"
+                    value={restartForm.venueFee}
+                    onChange={(e) => setRestartForm(prev => ({ ...prev, venueFee: e.target.value }))}
+                  />
+                </div>
+              </div>
+              <div className="flex gap-2 justify-end">
+                <Button variant="outline" onClick={() => {
+                  setRestartingStudent(null)
+                  setRestartForm({ sessions: '', fee: '', venueFee: '' })
+                }}>
+                  取消
+                </Button>
+                <Button onClick={handleRestartSubmit}>
+                  确认重启
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
         </div>
       )}
 

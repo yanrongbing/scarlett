@@ -1,11 +1,12 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Star, ArrowLeft } from 'lucide-react'
+import { Badge } from '@/components/ui/badge'
+import { Star, ArrowLeft, Upload, FileText, Eye, X } from 'lucide-react'
 import { Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, ResponsiveContainer } from 'recharts'
 import type { Student, RatingDimensions } from '@/lib/types'
 import { getStudentProgress, calculateCompositeScore, formatProfit } from '@/lib/utils-helper'
@@ -16,6 +17,7 @@ interface StudentDetailProps {
   onBack: () => void
   onEdit: () => void
   onUpdateRatings: (ratings: RatingDimensions) => void
+  onUpdateStudent?: (updates: Partial<Student>) => void
 }
 
 export function StudentDetail({
@@ -24,6 +26,7 @@ export function StudentDetail({
   onBack,
   onEdit,
   onUpdateRatings,
+  onUpdateStudent,
 }: StudentDetailProps) {
   const [isEditingRatings, setIsEditingRatings] = useState(false)
   const [ratings, setRatings] = useState<RatingDimensions>(
@@ -35,6 +38,9 @@ export function StudentDetail({
       loyalty: 0,
     }
   )
+  const [previewPdf, setPreviewPdf] = useState<string | null>(null)
+  const trainingPlanInputRef = useRef<HTMLInputElement>(null)
+  const contractInputRef = useRef<HTMLInputElement>(null)
 
   if (!student) {
     return (
@@ -69,6 +75,22 @@ export function StudentDetail({
   const handleSaveRatings = () => {
     onUpdateRatings(ratings)
     setIsEditingRatings(false)
+  }
+
+  const handleFileUpload = (type: 'trainingPlan' | 'contract', event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    if (!file || !onUpdateStudent) return
+
+    const reader = new FileReader()
+    reader.onload = (e) => {
+      const dataUrl = e.target?.result as string
+      if (type === 'trainingPlan') {
+        onUpdateStudent({ trainingPlanPdf: dataUrl })
+      } else {
+        onUpdateStudent({ contractPdf: dataUrl })
+      }
+    }
+    reader.readAsDataURL(file)
   }
 
   return (
@@ -244,13 +266,13 @@ export function StudentDetail({
                         ['learning', '求知欲', student.ratings.learning],
                         ['loyalty', '粘性', student.ratings.loyalty],
                       ].map(([, label, value]) => (
-                        <div key={label} className="flex justify-between items-center">
-                          <span className="text-muted-foreground">{label}:</span>
-                          <div className="flex gap-1">
+                        <div key={label} className="flex items-center gap-3">
+                          <span className="text-muted-foreground w-16">{label}</span>
+                          <div className="flex gap-0.5">
                             {[1, 2, 3, 4, 5].map((i) => (
                               <Star
                                 key={i}
-                                className={`w-3 h-3 ${
+                                className={`w-4 h-4 ${
                                   i <= (value as number)
                                     ? 'fill-yellow-400 text-yellow-400'
                                     : 'text-gray-300'
@@ -258,7 +280,7 @@ export function StudentDetail({
                               />
                             ))}
                           </div>
-                          <span className="font-medium">{value}/5</span>
+                          <span className="font-medium w-8 text-right">{value}/5</span>
                         </div>
                       ))}
                     </div>
@@ -272,11 +294,12 @@ export function StudentDetail({
                 <ResponsiveContainer width="100%" height={200}>
                   <RadarChart data={radarData}>
                     <PolarGrid stroke="hsl(var(--border))" />
-                    <PolarAngleAxis dataKey="name" stroke="hsl(var(--muted-foreground))" />
+                    <PolarAngleAxis dataKey="name" stroke="hsl(var(--muted-foreground))" tick={{ fontSize: 11 }} />
                     <PolarRadiusAxis
                       angle={90}
                       domain={[0, 5]}
-                      stroke="hsl(var(--border))"
+                      tick={false}
+                      axisLine={false}
                     />
                     <Radar
                       name="评分"
@@ -306,36 +329,137 @@ export function StudentDetail({
       )}
 
       {/* Documents */}
-      <div className="grid gap-4 md:grid-cols-2">
-        {student.trainingPlanPdf && (
-          <Card className="bg-card border-border">
-            <CardHeader>
-              <CardTitle className="text-sm text-muted-foreground">训练计划PDF</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <Button size="sm" variant="outline" asChild>
-                <a href={student.trainingPlanPdf} download="training-plan.pdf">
-                  下载PDF
-                </a>
+      <Card className="bg-card border-border mb-6">
+        <CardHeader>
+          <CardTitle className="text-sm text-muted-foreground">文档管理</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid gap-4 md:grid-cols-2">
+            {/* 训练计划 */}
+            <div className="space-y-2">
+              <Label className="text-sm font-medium">训练计划PDF</Label>
+              <input
+                ref={trainingPlanInputRef}
+                type="file"
+                accept=".pdf"
+                className="hidden"
+                onChange={(e) => handleFileUpload('trainingPlan', e)}
+              />
+              {student.trainingPlanPdf ? (
+                <div className="flex items-center gap-2">
+                  <Button 
+                    size="sm" 
+                    variant="outline" 
+                    className="gap-1"
+                    onClick={() => setPreviewPdf(student.trainingPlanPdf!)}
+                  >
+                    <Eye className="w-3 h-3" />
+                    预览
+                  </Button>
+                  <Button 
+                    size="sm" 
+                    variant="outline"
+                    onClick={() => trainingPlanInputRef.current?.click()}
+                  >
+                    <Upload className="w-3 h-3" />
+                    更换
+                  </Button>
+                </div>
+              ) : (
+                <Button 
+                  size="sm" 
+                  variant="outline" 
+                  className="gap-1"
+                  onClick={() => trainingPlanInputRef.current?.click()}
+                >
+                  <Upload className="w-3 h-3" />
+                  上传训练计划
+                </Button>
+              )}
+            </div>
+
+            {/* 合同 */}
+            <div className="space-y-2">
+              <Label className="text-sm font-medium">合同文档</Label>
+              <input
+                ref={contractInputRef}
+                type="file"
+                accept=".pdf"
+                className="hidden"
+                onChange={(e) => handleFileUpload('contract', e)}
+              />
+              {student.contractPdf ? (
+                <div className="flex items-center gap-2">
+                  <Button 
+                    size="sm" 
+                    variant="outline" 
+                    className="gap-1"
+                    onClick={() => setPreviewPdf(student.contractPdf!)}
+                  >
+                    <Eye className="w-3 h-3" />
+                    预览
+                  </Button>
+                  <Button 
+                    size="sm" 
+                    variant="outline"
+                    onClick={() => contractInputRef.current?.click()}
+                  >
+                    <Upload className="w-3 h-3" />
+                    更换
+                  </Button>
+                </div>
+              ) : (
+                <Button 
+                  size="sm" 
+                  variant="outline" 
+                  className="gap-1"
+                  onClick={() => contractInputRef.current?.click()}
+                >
+                  <Upload className="w-3 h-3" />
+                  上传合同
+                </Button>
+              )}
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* 学员状态 */}
+      {student.status === 'ended' && (
+        <Card className="bg-card border-border border-muted-foreground/50 mb-6">
+          <CardContent className="py-4">
+            <div className="flex items-center justify-center gap-2">
+              <Badge variant="secondary" className="text-base px-4 py-1">已结课</Badge>
+              {student.endedAt && (
+                <span className="text-sm text-muted-foreground">
+                  结课时间: {new Date(student.endedAt).toLocaleDateString('zh-CN')}
+                </span>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* PDF预览弹窗 */}
+      {previewPdf && (
+        <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4">
+          <div className="bg-card rounded-lg w-full max-w-4xl h-[90vh] flex flex-col">
+            <div className="flex items-center justify-between p-4 border-b border-border">
+              <h3 className="font-medium">PDF预览</h3>
+              <Button variant="ghost" size="icon" onClick={() => setPreviewPdf(null)}>
+                <X className="w-4 h-4" />
               </Button>
-            </CardContent>
-          </Card>
-        )}
-        {student.contractPdf && (
-          <Card className="bg-card border-border">
-            <CardHeader>
-              <CardTitle className="text-sm text-muted-foreground">合同文档</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <Button size="sm" variant="outline" asChild>
-                <a href={student.contractPdf} download="contract.pdf">
-                  下载PDF
-                </a>
-              </Button>
-            </CardContent>
-          </Card>
-        )}
-      </div>
+            </div>
+            <div className="flex-1 p-4">
+              <iframe
+                src={previewPdf}
+                className="w-full h-full rounded border border-border"
+                title="PDF预览"
+              />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
