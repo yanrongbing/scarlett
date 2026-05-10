@@ -15,6 +15,7 @@ interface RiskViewProps {
   onRenewStudent?: (student: Student) => void
   onSelectStudent?: (student: Student) => void
   onEndCourse?: (studentId: string) => void
+  onPauseCourse?: (studentId: string) => void
 }
 
 interface RiskStudent {
@@ -43,7 +44,7 @@ function getWeekRange(date: Date, weeksAgo: number = 0) {
   return { start: monday, end: sunday }
 }
 
-export function RiskView({ students, sessions, getStudent, onRenewStudent, onSelectStudent, onEndCourse }: RiskViewProps) {
+export function RiskView({ students, sessions, getStudent, onRenewStudent, onSelectStudent, onEndCourse, onPauseCourse }: RiskViewProps) {
   // 近1周新增学员
   const newStudentsThisWeek = useMemo(() => {
     const now = new Date()
@@ -70,23 +71,16 @@ export function RiskView({ students, sessions, getStudent, onRenewStudent, onSel
       .sort((a, b) => a.remaining - b.remaining)
   }, [students, sessions])
 
-  // 近两周重点学员（本周和下周排课超过4节的学员）
+  // 近两周重点学员（上一周和本周，以自然周为基准）
   const topStudents = useMemo(() => {
     const now = new Date()
     const thisWeek = getWeekRange(now, 0)
+    const lastWeek = getWeekRange(now, 1)
     
-    // 计算下周范围
-    const nextWeekStart = new Date(thisWeek.end)
-    nextWeekStart.setDate(nextWeekStart.getDate() + 1)
-    nextWeekStart.setHours(0, 0, 0, 0)
-    const nextWeekEnd = new Date(nextWeekStart)
-    nextWeekEnd.setDate(nextWeekEnd.getDate() + 6)
-    nextWeekEnd.setHours(23, 59, 59, 999)
+    const startStr = lastWeek.start.toISOString().split('T')[0]
+    const endStr = thisWeek.end.toISOString().split('T')[0]
     
-    const startStr = thisWeek.start.toISOString().split('T')[0]
-    const endStr = nextWeekEnd.toISOString().split('T')[0]
-    
-    // 只统计本周和下周的课程
+    // 统计上一周和本周的课程
     const twoWeekSessions = sessions.filter(s => s.date >= startStr && s.date <= endStr)
     
     const studentSessionCounts: Record<string, number> = {}
@@ -103,11 +97,13 @@ export function RiskView({ students, sessions, getStudent, onRenewStudent, onSel
       .sort((a, b) => b.count - a.count)
   }, [sessions, getStudent])
 
-  // 近期静默学员（近2周未排课）
+  // 近期静默学员（从今天起倒推20天内，未排课且未结课的学员）
   const silentStudents = useMemo(() => {
     const now = new Date()
-    const twoWeeksAgo = getWeekRange(now, 1)
-    const startStr = twoWeeksAgo.start.toISOString().split('T')[0]
+    const twentyDaysAgo = new Date(now)
+    twentyDaysAgo.setDate(twentyDaysAgo.getDate() - 20)
+    
+    const startStr = twentyDaysAgo.toISOString().split('T')[0]
     const endStr = now.toISOString().split('T')[0]
     
     const activeStudentIds = new Set(
@@ -116,7 +112,17 @@ export function RiskView({ students, sessions, getStudent, onRenewStudent, onSel
         .map(s => s.studentId)
     )
     
-    return students.filter(s => !activeStudentIds.has(s.id))
+    return students.filter(s => {
+      // 排除已结课学员
+      if (s.status === 'ended') return false
+      // 排除已暂停且在30天内的学员
+      if (s.status === 'paused' && s.pausedAt) {
+        const pausedDate = new Date(s.pausedAt)
+        const daysSincePaused = (now.getTime() - pausedDate.getTime()) / (1000 * 60 * 60 * 24)
+        if (daysSincePaused < 30) return false
+      }
+      return !activeStudentIds.has(s.id)
+    })
   }, [students, sessions])
 
   // 课时分析
@@ -323,19 +329,32 @@ export function RiskView({ students, sessions, getStudent, onRenewStudent, onSel
             </CardTitle>
           </CardHeader>
           <CardContent className="px-3 pb-3 md:px-4 md:pb-4 pt-0">
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-1.5">
+            <div className="space-y-1.5">
               {silentStudents.map(student => (
                 <div 
                   key={student.id}
-                  className="flex items-center gap-1.5 p-1.5 rounded bg-destructive/5 border border-destructive/20"
+                  className="flex items-center justify-between p-2 rounded bg-destructive/5 border border-destructive/20"
                 >
-                  <div className="w-5 h-5 rounded-full bg-destructive/20 flex items-center justify-center flex-shrink-0">
-                    <User className="w-2.5 h-2.5 text-destructive" />
+                  <div className="flex items-center gap-2 min-w-0 flex-1">
+                    <div className="w-5 h-5 rounded-full bg-destructive/20 flex items-center justify-center flex-shrink-0">
+                      <User className="w-2.5 h-2.5 text-destructive" />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-xs font-medium text-foreground truncate">{student.name}</p>
+                      <p className="text-xs text-destructive">20天内未排课</p>
+                    </div>
                   </div>
-                  <div className="min-w-0 flex-1">
-                    <p className="text-xs font-medium text-foreground truncate">{student.name}</p>
-                    <p className="text-xs text-destructive">2周未排课</p>
-                  </div>
+                  {onPauseCourse && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="h-6 text-xs gap-1 px-2 border-destructive/50 text-destructive hover:bg-destructive/10 flex-shrink-0"
+                      onClick={() => onPauseCourse(student.id)}
+                    >
+                      <Clock className="w-3 h-3" />
+                      暂停课程
+                    </Button>
+                  )}
                 </div>
               ))}
             </div>

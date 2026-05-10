@@ -47,7 +47,10 @@ export default function CoachManagerPage() {
       <div className="min-h-screen bg-background">
         <Sidebar 
           activeTab={activeTab}
-          onTabChange={setActiveTab}
+          onTabChange={(tab) => {
+            setActiveTab(tab)
+            setSelectedStudent(null) // 清除选中学员以返回主视图
+          }}
           onExport={store.exportData}
           onImport={() => {}}
         />
@@ -63,6 +66,11 @@ export default function CoachManagerPage() {
               }}
               onUpdateRatings={(ratings: RatingDimensions) => {
                 store.updateStudentRatings(selectedStudent.id, ratings)
+              }}
+              onUpdateStudent={(updates) => {
+                store.updateStudent(selectedStudent.id, updates)
+                // 更新选中的学员对象以保持同步
+                setSelectedStudent(prev => prev ? { ...prev, ...updates } : null)
               }}
             />
           </div>
@@ -104,6 +112,7 @@ export default function CoachManagerPage() {
               onConfirmRenewal={store.confirmRenewal}
               onDeleteRenewal={store.deleteRenewal}
               onSelectStudent={setSelectedStudent}
+              onRestartCourse={store.restartCourse}
             />
           )}
           
@@ -126,6 +135,7 @@ export default function CoachManagerPage() {
               onRenewStudent={setRenewingStudent}
               onSelectStudent={setSelectedStudent}
               onEndCourse={store.endCourse}
+              onPauseCourse={store.pauseCourse}
             />
           )}
         </div>

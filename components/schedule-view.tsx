@@ -316,7 +316,7 @@ export function ScheduleView({
                   <SelectValue placeholder="请选择学员" />
                 </SelectTrigger>
                 <SelectContent>
-                  {students.map(s => (
+                  {students.filter(s => s.status !== 'ended').map(s => (
                     <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
                   ))}
                 </SelectContent>

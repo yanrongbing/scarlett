@@ -198,13 +198,26 @@ export function OverviewView({ students, sessions, getStudent, onSelectStudent, 
     return stats
   }, [students])
 
-  // 学员进度 - 按消耗进度排序
+  // 学员进度 - 按消耗进度排序，过滤掉剩余0节、暂停和结课学员
   const studentProgress = useMemo(() => {
+    const now = new Date()
     return students
+      .filter(student => {
+        // 排除结课学员
+        if (student.status === 'ended') return false
+        // 排除暂停中的学员（30天内）
+        if (student.status === 'paused' && student.pausedAt) {
+          const pausedDate = new Date(student.pausedAt)
+          const daysSincePaused = (now.getTime() - pausedDate.getTime()) / (1000 * 60 * 60 * 24)
+          if (daysSincePaused < 30) return false
+        }
+        return true
+      })
       .map(student => ({
         student,
         progress: getStudentProgress(student),
       }))
+      .filter(item => item.progress.remaining > 0) // 过滤掉剩余0节的学员
       .sort((a, b) => b.progress.percentage - a.progress.percentage)
   }, [students])
 
@@ -250,7 +263,7 @@ export function OverviewView({ students, sessions, getStudent, onSelectStudent, 
             <CardTitle className="text-sm font-medium text-muted-foreground">本周利润</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold text-foreground">¥{formatProfit(weekStats.profit)}</div>
+            <div className="text-3xl font-bold text-success">¥{formatProfit(weekStats.profit)}</div>
             <p className="text-xs text-muted-foreground mt-1">基于已完成课程</p>
           </CardContent>
         </Card>
@@ -281,7 +294,7 @@ export function OverviewView({ students, sessions, getStudent, onSelectStudent, 
             <CardTitle className="text-sm font-medium text-muted-foreground">本月利润</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold text-foreground">¥{formatProfit(monthStats.profit)}</div>
+            <div className="text-3xl font-bold text-success">¥{formatProfit(monthStats.profit)}</div>
             <p className="text-xs text-muted-foreground mt-1">基于已完成课程</p>
           </CardContent>
         </Card>
@@ -319,18 +332,19 @@ export function OverviewView({ students, sessions, getStudent, onSelectStudent, 
                 <Line
                   type="monotone"
                   dataKey="profit"
-                  stroke="hsl(var(--primary))"
-                  strokeWidth={2}
-                  dot={{ fill: 'hsl(var(--primary))', r: 5, strokeWidth: 2, stroke: 'hsl(var(--background))' }}
-                  activeDot={{ r: 7, strokeWidth: 2 }}
+                  stroke="#10b981"
+                  strokeWidth={3}
+                  connectNulls={true}
+                  dot={{ fill: '#10b981', r: 5, strokeWidth: 2, stroke: '#fff' }}
+                  activeDot={{ r: 7, strokeWidth: 2, fill: '#10b981' }}
                   label={({ x, y, value }) => (
                     <text
                       x={x}
-                      y={y - 10}
-                      fill="hsl(var(--foreground))"
+                      y={y - 12}
+                      fill="#10b981"
                       textAnchor="middle"
-                      fontSize={10}
-                      fontWeight={500}
+                      fontSize={11}
+                      fontWeight={700}
                     >
                       {value > 0 ? `¥${value}` : ''}
                     </text>
@@ -346,22 +360,20 @@ export function OverviewView({ students, sessions, getStudent, onSelectStudent, 
         </CardContent>
       </Card>
 
-      {/* 未来30天收入预期 */}
-      <Card className="bg-card border-border">
-        <CardHeader>
-          <CardTitle className="text-sm font-medium">未来30天收入预期</CardTitle>
-        </CardHeader>
-        <CardContent className="grid gap-4 md:grid-cols-2">
-          <div className="space-y-2">
-            <p className="text-xs text-muted-foreground">已确认收入</p>
-            <p className="text-2xl font-bold text-foreground">¥{formatProfit(futureIncomeProjection.confirmed)}</p>
-          </div>
-          <div className="space-y-2">
-            <p className="text-xs text-muted-foreground">预期收入（待确认续课）</p>
-            <p className="text-2xl font-bold text-foreground">¥{formatProfit(futureIncomeProjection.pending)}</p>
-          </div>
-        </CardContent>
-      </Card>
+      {/* 未来30天待续课收入 */}
+      {futureIncomeProjection.pending > 0 && (
+        <Card className="bg-card border-border">
+          <CardHeader>
+            <CardTitle className="text-sm font-medium">未来30天待续课收入</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-2">
+              <p className="text-xs text-muted-foreground">计划续课收入（待确认）</p>
+              <p className="text-2xl font-bold text-success">¥{formatProfit(futureIncomeProjection.pending)}</p>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* 学员来源统计 */}
       <Card className="bg-card border-border">

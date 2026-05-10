@@ -20,6 +20,8 @@ export interface RatingDimensions {
   loyalty: number // 粘性
 }
 
+export type StudentStatus = 'active' | 'paused' | 'ended'
+
 export interface Student {
   id: string
   name: string
@@ -38,6 +40,9 @@ export interface Student {
   ratings?: RatingDimensions // 五维评分
   ratings_updated_at?: string
   createdAt: string
+  status?: StudentStatus // 学员状态: active/paused/ended
+  pausedAt?: string // 暂停时间
+  endedAt?: string // 结课时间
 }
 
 export type SessionStatus = 'planned' | 'completed'
