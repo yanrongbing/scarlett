@@ -15,6 +15,7 @@ import { TrainingPlanTab } from '@/components/student-detail/training-plan-tab'
 import { SessionRecordsTab } from '@/components/student-detail/session-records-tab'
 import { TrainingEffectTab } from '@/components/student-detail/training-effect-tab'
 import { PdfExportTab } from '@/components/student-detail/pdf-export-tab'
+import { StudentForm } from '@/components/student-form'
 
 interface StudentDetailProps {
   student: Student | null
@@ -64,6 +65,7 @@ export function StudentDetail({
   const [refundConfirm, setRefundConfirm] = useState(false)
   const [showDeleteDialog, setShowDeleteDialog] = useState(false)
   const [deleteConfirmName, setDeleteConfirmName] = useState('')
+  const [showEditForm, setShowEditForm] = useState(false)
   const trainingPlanInputRef = useRef<HTMLInputElement>(null)
   const contractInputRef = useRef<HTMLInputElement>(null)
 
@@ -164,7 +166,7 @@ export function StudentDetail({
             <Badge variant={student.status === 'active' ? 'default' : student.status === 'paused' ? 'secondary' : 'outline'}>
               {student.status === 'active' ? '活跃' : student.status === 'paused' ? '暂停' : '已结课'}
             </Badge>
-            <Button variant="outline" size="sm" onClick={onEdit}>
+            <Button variant="outline" size="sm" onClick={() => setShowEditForm(true)}>
               编辑
             </Button>
             {onDeleteStudent && (
@@ -703,6 +705,17 @@ export function StudentDetail({
           </Card>
         </div>
       )}
+
+      {/* 编辑学员信息弹窗 */}
+      <StudentForm
+        open={showEditForm}
+        onOpenChange={setShowEditForm}
+        initialData={student}
+        onSubmit={(data) => {
+          onUpdateStudent?.(data)
+          setShowEditForm(false)
+        }}
+      />
 
       {/* PDF预览弹窗 */}
       {previewPdf && (
