@@ -81,11 +81,11 @@ export function StudentsView({
   const [refundAmount, setRefundAmount] = useState('')
   const [refundConfirm, setRefundConfirm] = useState(false)
 
-  // 续课信息默认展开，点击姓名折叠
-  const [collapsedStudentIds, setCollapsedStudentIds] = useState<Set<string>>(new Set())
+  // 默认仅显示未来14天的已确认续课，点击姓名展开全部计划续课
+  const [expandedStudentIds, setExpandedStudentIds] = useState<Set<string>>(new Set())
 
   const toggleRenewals = (studentId: string) => {
-    setCollapsedStudentIds(prev => {
+    setExpandedStudentIds(prev => {
       const next = new Set(prev)
       if (next.has(studentId)) next.delete(studentId)
       else next.add(studentId)
@@ -131,8 +131,10 @@ export function StudentsView({
     startOfToday.setHours(0, 0, 0, 0)
     const windowEnd = new Date(startOfToday)
     windowEnd.setDate(windowEnd.getDate() + 15)
-    const confirmedRenewals = (student.renewalHistory || []).filter(r => {
-      if (!r.confirmed) return false
+    const allConfirmedRenewals = (student.renewalHistory || [])
+      .filter(r => r.confirmed)
+      .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+    const confirmedRenewals = allConfirmedRenewals.filter(r => {
       const time = new Date(r.date).getTime()
       return time >= startOfToday.getTime() && time < windowEnd.getTime()
     })
@@ -149,6 +151,7 @@ export function StudentsView({
       sessionProfit, 
       pendingRenewals, 
       confirmedRenewals,
+      allConfirmedRenewals,
       progressColor: progressInfo.color,
       compositeScore,
     }
@@ -408,8 +411,9 @@ export function StudentsView({
                   {sortedActiveStudents.map(student => {
                     const stats = getStudentStats(student)
                     const courseType = student.courseType || 'offline'
-                    const hasRenewalRows = stats.confirmedRenewals.length > 0 || stats.pendingRenewals.length > 0
-                    const isExpanded = !collapsedStudentIds.has(student.id)
+                    const hasRenewalRows = stats.allConfirmedRenewals.length > stats.confirmedRenewals.length
+                    const isExpanded = expandedStudentIds.has(student.id)
+                    const visibleConfirmedRenewals = isExpanded ? stats.allConfirmedRenewals : stats.confirmedRenewals
                     return (
                       <Fragment key={student.id}>
                         <tr 
@@ -421,7 +425,7 @@ export function StudentsView({
                               <button
                                 type="button"
                                 aria-expanded={isExpanded}
-                                aria-label={`${isExpanded ? '折叠' : '展开'}${student.name}的续课信息`}
+                                aria-label={`${isExpanded ? '折叠' : '展开'}${student.name}的全部计划续课`}
                                 className="flex items-center gap-1 text-left rounded hover:text-primary transition-colors"
                                 onClick={(e) => { e.stopPropagation(); toggleRenewals(student.id) }}
                               >
@@ -489,7 +493,7 @@ export function StudentsView({
                           </td>
                         </tr>
                         {/* Confirmed renewal records */}
-                        {isExpanded && stats.confirmedRenewals.map(renewal => (
+                        {visibleConfirmedRenewals.map(renewal => (
                           <tr key={renewal.id} className="border-b border-border bg-success/5">
                             <td colSpan={8} className="px-3 py-1.5">
                               <div className="flex items-center justify-between">
@@ -517,7 +521,7 @@ export function StudentsView({
                           </tr>
                         ))}
                         {/* Pending renewal confirmations */}
-                        {isExpanded && stats.pendingRenewals.map(renewal => (
+                        {stats.pendingRenewals.map(renewal => (
                           <tr key={renewal.id} className="border-b border-border bg-warning/5">
                             <td colSpan={8} className="px-3 py-1.5">
                               <div className="flex items-center justify-between">
@@ -562,8 +566,9 @@ export function StudentsView({
           {sortedActiveStudents.map(student => {
             const stats = getStudentStats(student)
             const courseType = student.courseType || 'offline'
-            const hasRenewalRows = stats.confirmedRenewals.length > 0 || stats.pendingRenewals.length > 0
-            const isExpanded = !collapsedStudentIds.has(student.id)
+            const hasRenewalRows = stats.allConfirmedRenewals.length > stats.confirmedRenewals.length
+            const isExpanded = expandedStudentIds.has(student.id)
+            const visibleConfirmedRenewals = isExpanded ? stats.allConfirmedRenewals : stats.confirmedRenewals
             return (
               <Card 
                 key={student.id} 
@@ -648,7 +653,7 @@ export function StudentsView({
                     )}
 
                     {/* Confirmed renewals */}
-                    {isExpanded && stats.confirmedRenewals.map(renewal => (
+                    {visibleConfirmedRenewals.map(renewal => (
                       <div key={renewal.id} className="flex items-center gap-2 p-1.5 bg-success/10 rounded text-xs">
                         <CheckCircle className="w-3 h-3 text-success flex-shrink-0" />
                         <span className="text-success flex-1">
@@ -665,7 +670,7 @@ export function StudentsView({
                       </div>
                     ))}
                     {/* Pending renewals */}
-                    {isExpanded && stats.pendingRenewals.map(renewal => (
+                    {stats.pendingRenewals.map(renewal => (
                       <div key={renewal.id} className="flex items-center gap-2 p-1.5 bg-warning/10 rounded text-xs">
                         <Checkbox
                           id={`card-confirm-${renewal.id}`}
