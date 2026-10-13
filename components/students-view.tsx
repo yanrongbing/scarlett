@@ -81,6 +81,18 @@ export function StudentsView({
   const [refundAmount, setRefundAmount] = useState('')
   const [refundConfirm, setRefundConfirm] = useState(false)
 
+  // 续课信息默认展开，点击姓名折叠
+  const [collapsedStudentIds, setCollapsedStudentIds] = useState<Set<string>>(new Set())
+
+  const toggleRenewals = (studentId: string) => {
+    setCollapsedStudentIds(prev => {
+      const next = new Set(prev)
+      if (next.has(studentId)) next.delete(studentId)
+      else next.add(studentId)
+      return next
+    })
+  }
+
   const handleEdit = (student: Student) => {
     setEditingStudent(student)
     setIsFormOpen(true)
@@ -114,8 +126,16 @@ export function StudentsView({
     
     // Pending (unconfirmed) renewals
     const pendingRenewals = (student.renewalHistory || []).filter(r => !r.confirmed)
-    // Confirmed renewals
-    const confirmedRenewals = (student.renewalHistory || []).filter(r => r.confirmed)
+    // Confirmed renewals: only those dated within the next 14 days (today inclusive)
+    const startOfToday = new Date()
+    startOfToday.setHours(0, 0, 0, 0)
+    const windowEnd = new Date(startOfToday)
+    windowEnd.setDate(windowEnd.getDate() + 15)
+    const confirmedRenewals = (student.renewalHistory || []).filter(r => {
+      if (!r.confirmed) return false
+      const time = new Date(r.date).getTime()
+      return time >= startOfToday.getTime() && time < windowEnd.getTime()
+    })
     
     // Five-dimension rating
     const compositeScore = calculateCompositeScore(student.ratings)
@@ -388,6 +408,8 @@ export function StudentsView({
                   {sortedActiveStudents.map(student => {
                     const stats = getStudentStats(student)
                     const courseType = student.courseType || 'offline'
+                    const hasRenewalRows = stats.confirmedRenewals.length > 0 || stats.pendingRenewals.length > 0
+                    const isExpanded = !collapsedStudentIds.has(student.id)
                     return (
                       <Fragment key={student.id}>
                         <tr 
@@ -395,9 +417,24 @@ export function StudentsView({
                           onClick={() => onSelectStudent?.(student)}
                         >
                           <td className="px-3 py-3">
-                            <div className="flex items-center gap-2">
-                              <span className="text-base font-medium text-foreground">{student.name}</span>
-                            </div>
+                            {hasRenewalRows ? (
+                              <button
+                                type="button"
+                                aria-expanded={isExpanded}
+                                aria-label={`${isExpanded ? '折叠' : '展开'}${student.name}的续课信息`}
+                                className="flex items-center gap-1 text-left rounded hover:text-primary transition-colors"
+                                onClick={(e) => { e.stopPropagation(); toggleRenewals(student.id) }}
+                              >
+                                {isExpanded
+                                  ? <ChevronDown className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+                                  : <ChevronRight className="w-4 h-4 text-muted-foreground flex-shrink-0" />}
+                                <span className="text-base font-medium text-foreground">{student.name}</span>
+                              </button>
+                            ) : (
+                              <div className="flex items-center gap-2">
+                                <span className="text-base font-medium text-foreground">{student.name}</span>
+                              </div>
+                            )}
                           </td>
                           <td className="px-2 py-3 text-center">
                             <Badge className={cn("text-xs border", courseTypeColors[courseType])} variant="secondary">
@@ -452,7 +489,7 @@ export function StudentsView({
                           </td>
                         </tr>
                         {/* Confirmed renewal records */}
-                        {stats.confirmedRenewals.map(renewal => (
+                        {isExpanded && stats.confirmedRenewals.map(renewal => (
                           <tr key={renewal.id} className="border-b border-border bg-success/5">
                             <td colSpan={8} className="px-3 py-1.5">
                               <div className="flex items-center justify-between">
@@ -480,7 +517,7 @@ export function StudentsView({
                           </tr>
                         ))}
                         {/* Pending renewal confirmations */}
-                        {stats.pendingRenewals.map(renewal => (
+                        {isExpanded && stats.pendingRenewals.map(renewal => (
                           <tr key={renewal.id} className="border-b border-border bg-warning/5">
                             <td colSpan={8} className="px-3 py-1.5">
                               <div className="flex items-center justify-between">
@@ -525,6 +562,8 @@ export function StudentsView({
           {sortedActiveStudents.map(student => {
             const stats = getStudentStats(student)
             const courseType = student.courseType || 'offline'
+            const hasRenewalRows = stats.confirmedRenewals.length > 0 || stats.pendingRenewals.length > 0
+            const isExpanded = !collapsedStudentIds.has(student.id)
             return (
               <Card 
                 key={student.id} 
@@ -535,7 +574,22 @@ export function StudentsView({
                   <div className="flex items-start justify-between mb-2">
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-1 mb-1">
-                        <span className="text-sm font-medium text-foreground truncate">{student.name}</span>
+                        {hasRenewalRows ? (
+                          <button
+                            type="button"
+                            aria-expanded={isExpanded}
+                            aria-label={`${isExpanded ? '折叠' : '展开'}${student.name}的续课信息`}
+                            className="flex items-center gap-1 min-w-0 text-left hover:text-primary transition-colors"
+                            onClick={(e) => { e.stopPropagation(); toggleRenewals(student.id) }}
+                          >
+                            {isExpanded
+                              ? <ChevronDown className="w-3.5 h-3.5 text-muted-foreground flex-shrink-0" />
+                              : <ChevronRight className="w-3.5 h-3.5 text-muted-foreground flex-shrink-0" />}
+                            <span className="text-sm font-medium text-foreground truncate">{student.name}</span>
+                          </button>
+                        ) : (
+                          <span className="text-sm font-medium text-foreground truncate">{student.name}</span>
+                        )}
                       </div>
                       <div className="flex gap-1 flex-wrap">
                         <Badge className={cn("text-xs border px-1 py-0", courseTypeColors[courseType])} variant="secondary">
@@ -594,7 +648,7 @@ export function StudentsView({
                     )}
 
                     {/* Confirmed renewals */}
-                    {stats.confirmedRenewals.map(renewal => (
+                    {isExpanded && stats.confirmedRenewals.map(renewal => (
                       <div key={renewal.id} className="flex items-center gap-2 p-1.5 bg-success/10 rounded text-xs">
                         <CheckCircle className="w-3 h-3 text-success flex-shrink-0" />
                         <span className="text-success flex-1">
@@ -611,7 +665,7 @@ export function StudentsView({
                       </div>
                     ))}
                     {/* Pending renewals */}
-                    {stats.pendingRenewals.map(renewal => (
+                    {isExpanded && stats.pendingRenewals.map(renewal => (
                       <div key={renewal.id} className="flex items-center gap-2 p-1.5 bg-warning/10 rounded text-xs">
                         <Checkbox
                           id={`card-confirm-${renewal.id}`}
