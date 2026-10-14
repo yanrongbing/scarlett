@@ -81,6 +81,18 @@ export function StudentsView({
   const [refundAmount, setRefundAmount] = useState('')
   const [refundConfirm, setRefundConfirm] = useState(false)
 
+  // 默认仅显示未来14天的已确认续课，点击姓名展开全部计划续课
+  const [expandedStudentIds, setExpandedStudentIds] = useState<Set<string>>(new Set())
+
+  const toggleRenewals = (studentId: string) => {
+    setExpandedStudentIds(prev => {
+      const next = new Set(prev)
+      if (next.has(studentId)) next.delete(studentId)
+      else next.add(studentId)
+      return next
+    })
+  }
+
   const handleEdit = (student: Student) => {
     setEditingStudent(student)
     setIsFormOpen(true)
@@ -114,8 +126,18 @@ export function StudentsView({
     
     // Pending (unconfirmed) renewals
     const pendingRenewals = (student.renewalHistory || []).filter(r => !r.confirmed)
-    // Confirmed renewals
-    const confirmedRenewals = (student.renewalHistory || []).filter(r => r.confirmed)
+    // Confirmed renewals: only those dated within the next 14 days (today inclusive)
+    const startOfToday = new Date()
+    startOfToday.setHours(0, 0, 0, 0)
+    const windowEnd = new Date(startOfToday)
+    windowEnd.setDate(windowEnd.getDate() + 15)
+    const allConfirmedRenewals = (student.renewalHistory || [])
+      .filter(r => r.confirmed)
+      .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+    const confirmedRenewals = allConfirmedRenewals.filter(r => {
+      const time = new Date(r.date).getTime()
+      return time >= startOfToday.getTime() && time < windowEnd.getTime()
+    })
     
     // Five-dimension rating
     const compositeScore = calculateCompositeScore(student.ratings)
@@ -129,6 +151,7 @@ export function StudentsView({
       sessionProfit, 
       pendingRenewals, 
       confirmedRenewals,
+      allConfirmedRenewals,
       progressColor: progressInfo.color,
       compositeScore,
     }
@@ -242,10 +265,10 @@ export function StudentsView({
 
   // 操作按钮组件
   const ActionButtons = ({ student, stats, compact = false }: { student: Student; stats: ReturnType<typeof getStudentStats>; compact?: boolean }) => {
-    const buttonClass = compact ? "h-7 text-xs px-2 w-full" : "h-7 text-xs px-2"
+    const buttonClass = compact ? "h-7 text-xs px-2 w-full" : "h-7 text-xs px-1.5 gap-0.5"
 
     return (
-      <div className={cn(compact ? "grid grid-cols-2 gap-1" : "flex gap-1")}>
+      <div className={cn(compact ? "grid grid-cols-2 gap-1" : "flex gap-0.5")}>
         <Button
           size="sm"
           variant="outline"
@@ -336,7 +359,7 @@ export function StudentsView({
         <Card className="bg-card border-border">
           <CardContent className="p-0">
             <div className="overflow-x-auto">
-              <table className="w-full min-w-[900px]">
+              <table className="w-full min-w-[780px]">
                 <thead>
                   <tr className="border-b border-border bg-muted/30">
                     <th className="px-3 py-3 text-left text-sm font-medium text-muted-foreground">学员</th>
@@ -388,16 +411,27 @@ export function StudentsView({
                   {sortedActiveStudents.map(student => {
                     const stats = getStudentStats(student)
                     const courseType = student.courseType || 'offline'
+                    const hasAnyRenewals = stats.allConfirmedRenewals.length + stats.pendingRenewals.length > 0
+                    const isExpanded = expandedStudentIds.has(student.id)
+                    const visibleConfirmedRenewals = isExpanded ? stats.allConfirmedRenewals : stats.confirmedRenewals
                     return (
                       <Fragment key={student.id}>
                         <tr 
                           className="border-b border-border last:border-b-0 hover:bg-muted/30 cursor-pointer transition-colors"
                           onClick={() => onSelectStudent?.(student)}
                         >
-                          <td className="px-3 py-3">
-                            <div className="flex items-center gap-2">
+                          <td
+                            className="px-3 py-3"
+                            onClick={(e) => { e.stopPropagation(); toggleRenewals(student.id) }}
+                          >
+                            <button
+                              type="button"
+                              aria-expanded={isExpanded}
+                              aria-label={`${isExpanded ? '折叠' : '展开'}${student.name}的全部计划续课`}
+                              className="flex w-full items-center gap-1 text-left rounded-md hover:text-primary transition-colors"
+                            >
                               <span className="text-base font-medium text-foreground">{student.name}</span>
-                            </div>
+                            </button>
                           </td>
                           <td className="px-2 py-3 text-center">
                             <Badge className={cn("text-xs border", courseTypeColors[courseType])} variant="secondary">
@@ -451,8 +485,15 @@ export function StudentsView({
                             </div>
                           </td>
                         </tr>
+                        {isExpanded && !hasAnyRenewals && (
+                          <tr className="border-b border-border bg-muted/30">
+                            <td colSpan={8} className="px-3 py-1.5">
+                              <span className="text-xs text-muted-foreground">无续课计划</span>
+                            </td>
+                          </tr>
+                        )}
                         {/* Confirmed renewal records */}
-                        {stats.confirmedRenewals.map(renewal => (
+                        {visibleConfirmedRenewals.map(renewal => (
                           <tr key={renewal.id} className="border-b border-border bg-success/5">
                             <td colSpan={8} className="px-3 py-1.5">
                               <div className="flex items-center justify-between">
@@ -525,6 +566,9 @@ export function StudentsView({
           {sortedActiveStudents.map(student => {
             const stats = getStudentStats(student)
             const courseType = student.courseType || 'offline'
+            const hasAnyRenewals = stats.allConfirmedRenewals.length + stats.pendingRenewals.length > 0
+            const isExpanded = expandedStudentIds.has(student.id)
+            const visibleConfirmedRenewals = isExpanded ? stats.allConfirmedRenewals : stats.confirmedRenewals
             return (
               <Card 
                 key={student.id} 
@@ -535,7 +579,15 @@ export function StudentsView({
                   <div className="flex items-start justify-between mb-2">
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-1 mb-1">
-                        <span className="text-sm font-medium text-foreground truncate">{student.name}</span>
+                        <button
+                          type="button"
+                          aria-expanded={isExpanded}
+                          aria-label={`${isExpanded ? '折叠' : '展开'}${student.name}的续课信息`}
+                          className="flex items-center gap-1 min-w-0 text-left hover:text-primary transition-colors"
+                          onClick={(e) => { e.stopPropagation(); toggleRenewals(student.id) }}
+                        >
+                          <span className="text-sm font-medium text-foreground truncate">{student.name}</span>
+                        </button>
                       </div>
                       <div className="flex gap-1 flex-wrap">
                         <Badge className={cn("text-xs border px-1 py-0", courseTypeColors[courseType])} variant="secondary">
@@ -593,8 +645,13 @@ export function StudentsView({
                       </div>
                     )}
 
+                    {isExpanded && !hasAnyRenewals && (
+                      <div className="p-1.5 bg-muted/40 rounded text-xs text-muted-foreground">
+                        无续课计划
+                      </div>
+                    )}
                     {/* Confirmed renewals */}
-                    {stats.confirmedRenewals.map(renewal => (
+                    {visibleConfirmedRenewals.map(renewal => (
                       <div key={renewal.id} className="flex items-center gap-2 p-1.5 bg-success/10 rounded text-xs">
                         <CheckCircle className="w-3 h-3 text-success flex-shrink-0" />
                         <span className="text-success flex-1">

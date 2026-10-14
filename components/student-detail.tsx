@@ -17,6 +17,9 @@ import { TrainingEffectTab } from '@/components/student-detail/training-effect-t
 import { PdfExportTab } from '@/components/student-detail/pdf-export-tab'
 import { StudentForm } from '@/components/student-form'
 
+const tabTriggerClass =
+  'h-10 flex-none rounded-none border-0 border-b-2 border-transparent bg-transparent px-4 py-2 text-muted-foreground shadow-none data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-foreground data-[state=active]:shadow-none dark:text-muted-foreground dark:data-[state=active]:border-primary dark:data-[state=active]:bg-transparent dark:data-[state=active]:text-foreground'
+
 interface StudentDetailProps {
   student: Student | null
   sessions: Session[]
@@ -184,38 +187,38 @@ export function StudentDetail({
 
         {/* Tab导航 */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="w-full justify-start h-auto p-0 bg-transparent border-b-0 overflow-x-auto">
+          <TabsList className="w-full justify-start h-auto gap-0 rounded-none p-0 bg-transparent overflow-x-auto">
             <TabsTrigger 
               value="info" 
-              className="data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none px-4 py-2"
+              className={tabTriggerClass}
             >
               <User className="w-4 h-4 mr-1.5" />
               基本信息
             </TabsTrigger>
             <TabsTrigger 
               value="plan" 
-              className="data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none px-4 py-2"
+              className={tabTriggerClass}
             >
               <ClipboardList className="w-4 h-4 mr-1.5" />
               训练计划
             </TabsTrigger>
             <TabsTrigger 
               value="records" 
-              className="data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none px-4 py-2"
+              className={tabTriggerClass}
             >
               <BookOpen className="w-4 h-4 mr-1.5" />
               训练记录
             </TabsTrigger>
             <TabsTrigger 
               value="effect" 
-              className="data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none px-4 py-2"
+              className={tabTriggerClass}
             >
               <TrendingUp className="w-4 h-4 mr-1.5" />
               训练效果
             </TabsTrigger>
             <TabsTrigger 
               value="export" 
-              className="data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none px-4 py-2"
+              className={tabTriggerClass}
             >
               <FileDown className="w-4 h-4 mr-1.5" />
               导出PDF
@@ -595,7 +598,7 @@ export function StudentDetail({
               {!refundConfirm ? (
                 <>
                   <div className="space-y-3">
-                    <div className="p-3 bg-muted/50 rounded-md text-sm space-y-1">
+                    <div className="p-3 bg-muted/50 rounded-lg text-sm space-y-1">
                       <p>已完成课时：{completedCount} 节</p>
                       <p>总收费：¥{student.totalFee.toLocaleString()}</p>
                     </div>
@@ -609,7 +612,7 @@ export function StudentDetail({
                       />
                     </div>
                     {refundAmount && parseFloat(refundAmount) > 0 && (
-                      <div className="p-3 bg-warning/10 rounded-md text-sm text-warning">
+                      <div className="p-3 bg-warning/10 rounded-lg text-sm text-warning">
                         退费后实际收费：¥{(student.totalFee - parseFloat(refundAmount)).toLocaleString()}
                       </div>
                     )}
@@ -632,7 +635,7 @@ export function StudentDetail({
                 </>
               ) : (
                 <>
-                  <div className="p-4 bg-destructive/10 rounded-md space-y-2">
+                  <div className="p-4 bg-destructive/10 rounded-lg space-y-2">
                     <p className="text-sm font-medium text-destructive">确认退费信息</p>
                     <p className="text-sm">退费金额：¥{parseFloat(refundAmount).toLocaleString()}</p>
                     <p className="text-sm">退费后该学员将标记为已结课，利润将重新计算。</p>
@@ -665,7 +668,7 @@ export function StudentDetail({
                 <h3 className="text-lg font-semibold">删除学员档案</h3>
               </div>
               
-              <div className="p-4 bg-destructive/10 rounded-md space-y-2">
+              <div className="p-4 bg-destructive/10 rounded-lg space-y-2">
                 <p className="text-sm font-medium text-destructive">此操作不可撤销！</p>
                 <p className="text-sm">将永久删除 <strong>{student.name}</strong> 的全部档案，包括：</p>
                 <ul className="text-sm list-disc list-inside text-muted-foreground space-y-1">
@@ -728,7 +731,7 @@ export function StudentDetail({
               </Button>
             </div>
             <div className="flex-1 p-4">
-              <iframe src={previewPdf} className="w-full h-full rounded border" />
+              <iframe src={previewPdf} className="w-full h-full rounded-lg border" />
             </div>
           </div>
         </div>
