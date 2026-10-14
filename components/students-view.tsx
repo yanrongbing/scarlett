@@ -429,9 +429,6 @@ export function StudentsView({
                                 className="flex items-center gap-1 text-left rounded hover:text-primary transition-colors"
                                 onClick={(e) => { e.stopPropagation(); toggleRenewals(student.id) }}
                               >
-                                {isExpanded
-                                  ? <ChevronDown className="w-4 h-4 text-muted-foreground flex-shrink-0" />
-                                  : <ChevronRight className="w-4 h-4 text-muted-foreground flex-shrink-0" />}
                                 <span className="text-base font-medium text-foreground">{student.name}</span>
                               </button>
                             ) : (
@@ -587,9 +584,6 @@ export function StudentsView({
                             className="flex items-center gap-1 min-w-0 text-left hover:text-primary transition-colors"
                             onClick={(e) => { e.stopPropagation(); toggleRenewals(student.id) }}
                           >
-                            {isExpanded
-                              ? <ChevronDown className="w-3.5 h-3.5 text-muted-foreground flex-shrink-0" />
-                              : <ChevronRight className="w-3.5 h-3.5 text-muted-foreground flex-shrink-0" />}
                             <span className="text-sm font-medium text-foreground truncate">{student.name}</span>
                           </button>
                         ) : (
