@@ -411,7 +411,7 @@ export function StudentsView({
                   {sortedActiveStudents.map(student => {
                     const stats = getStudentStats(student)
                     const courseType = student.courseType || 'offline'
-                    const hasRenewalRows = stats.allConfirmedRenewals.length > stats.confirmedRenewals.length
+                    const hasAnyRenewals = stats.allConfirmedRenewals.length + stats.pendingRenewals.length > 0
                     const isExpanded = expandedStudentIds.has(student.id)
                     const visibleConfirmedRenewals = isExpanded ? stats.allConfirmedRenewals : stats.confirmedRenewals
                     return (
@@ -421,21 +421,15 @@ export function StudentsView({
                           onClick={() => onSelectStudent?.(student)}
                         >
                           <td className="px-3 py-3">
-                            {hasRenewalRows ? (
-                              <button
-                                type="button"
-                                aria-expanded={isExpanded}
-                                aria-label={`${isExpanded ? '折叠' : '展开'}${student.name}的全部计划续课`}
-                                className="flex items-center gap-1 text-left rounded hover:text-primary transition-colors"
-                                onClick={(e) => { e.stopPropagation(); toggleRenewals(student.id) }}
-                              >
-                                <span className="text-base font-medium text-foreground">{student.name}</span>
-                              </button>
-                            ) : (
-                              <div className="flex items-center gap-2">
-                                <span className="text-base font-medium text-foreground">{student.name}</span>
-                              </div>
-                            )}
+                            <button
+                              type="button"
+                              aria-expanded={isExpanded}
+                              aria-label={`${isExpanded ? '折叠' : '展开'}${student.name}的全部计划续课`}
+                              className="flex items-center gap-1 text-left rounded hover:text-primary transition-colors"
+                              onClick={(e) => { e.stopPropagation(); toggleRenewals(student.id) }}
+                            >
+                              <span className="text-base font-medium text-foreground">{student.name}</span>
+                            </button>
                           </td>
                           <td className="px-2 py-3 text-center">
                             <Badge className={cn("text-xs border", courseTypeColors[courseType])} variant="secondary">
@@ -489,6 +483,13 @@ export function StudentsView({
                             </div>
                           </td>
                         </tr>
+                        {isExpanded && !hasAnyRenewals && (
+                          <tr className="border-b border-border bg-muted/30">
+                            <td colSpan={8} className="px-3 py-1.5">
+                              <span className="text-xs text-muted-foreground">无续课计划</span>
+                            </td>
+                          </tr>
+                        )}
                         {/* Confirmed renewal records */}
                         {visibleConfirmedRenewals.map(renewal => (
                           <tr key={renewal.id} className="border-b border-border bg-success/5">
@@ -563,7 +564,7 @@ export function StudentsView({
           {sortedActiveStudents.map(student => {
             const stats = getStudentStats(student)
             const courseType = student.courseType || 'offline'
-            const hasRenewalRows = stats.allConfirmedRenewals.length > stats.confirmedRenewals.length
+            const hasAnyRenewals = stats.allConfirmedRenewals.length + stats.pendingRenewals.length > 0
             const isExpanded = expandedStudentIds.has(student.id)
             const visibleConfirmedRenewals = isExpanded ? stats.allConfirmedRenewals : stats.confirmedRenewals
             return (
@@ -576,19 +577,15 @@ export function StudentsView({
                   <div className="flex items-start justify-between mb-2">
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-1 mb-1">
-                        {hasRenewalRows ? (
-                          <button
-                            type="button"
-                            aria-expanded={isExpanded}
-                            aria-label={`${isExpanded ? '折叠' : '展开'}${student.name}的续课信息`}
-                            className="flex items-center gap-1 min-w-0 text-left hover:text-primary transition-colors"
-                            onClick={(e) => { e.stopPropagation(); toggleRenewals(student.id) }}
-                          >
-                            <span className="text-sm font-medium text-foreground truncate">{student.name}</span>
-                          </button>
-                        ) : (
+                        <button
+                          type="button"
+                          aria-expanded={isExpanded}
+                          aria-label={`${isExpanded ? '折叠' : '展开'}${student.name}的续课信息`}
+                          className="flex items-center gap-1 min-w-0 text-left hover:text-primary transition-colors"
+                          onClick={(e) => { e.stopPropagation(); toggleRenewals(student.id) }}
+                        >
                           <span className="text-sm font-medium text-foreground truncate">{student.name}</span>
-                        )}
+                        </button>
                       </div>
                       <div className="flex gap-1 flex-wrap">
                         <Badge className={cn("text-xs border px-1 py-0", courseTypeColors[courseType])} variant="secondary">
@@ -646,6 +643,11 @@ export function StudentsView({
                       </div>
                     )}
 
+                    {isExpanded && !hasAnyRenewals && (
+                      <div className="p-1.5 bg-muted/40 rounded text-xs text-muted-foreground">
+                        无续课计划
+                      </div>
+                    )}
                     {/* Confirmed renewals */}
                     {visibleConfirmedRenewals.map(renewal => (
                       <div key={renewal.id} className="flex items-center gap-2 p-1.5 bg-success/10 rounded text-xs">
