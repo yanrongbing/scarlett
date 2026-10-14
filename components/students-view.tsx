@@ -420,13 +420,15 @@ export function StudentsView({
                           className="border-b border-border last:border-b-0 hover:bg-muted/30 cursor-pointer transition-colors"
                           onClick={() => onSelectStudent?.(student)}
                         >
-                          <td className="px-3 py-3">
+                          <td
+                            className="px-3 py-3"
+                            onClick={(e) => { e.stopPropagation(); toggleRenewals(student.id) }}
+                          >
                             <button
                               type="button"
                               aria-expanded={isExpanded}
                               aria-label={`${isExpanded ? '折叠' : '展开'}${student.name}的全部计划续课`}
-                              className="flex items-center gap-1 text-left rounded hover:text-primary transition-colors"
-                              onClick={(e) => { e.stopPropagation(); toggleRenewals(student.id) }}
+                              className="flex w-full items-center gap-1 text-left rounded-md hover:text-primary transition-colors"
                             >
                               <span className="text-base font-medium text-foreground">{student.name}</span>
                             </button>

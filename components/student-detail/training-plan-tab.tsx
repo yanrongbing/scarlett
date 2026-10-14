@@ -407,7 +407,7 @@ function PhaseCard({
             </div>
             <div className="space-y-2">
               {(phase.trainingProjects || []).map((proj) => (
-                <div key={proj.id} className="p-3 bg-muted rounded flex justify-between items-start">
+                <div key={proj.id} className="p-3 bg-muted rounded-lg flex justify-between items-start">
                   <div className="flex-1">
                     <p className="font-medium text-sm">{proj.name}</p>
                     <p className="text-xs text-muted-foreground">{proj.description}</p>
@@ -422,7 +422,7 @@ function PhaseCard({
                 </div>
               ))}
               {newProject && (
-                <div className="p-3 border border-dashed rounded space-y-2">
+                <div className="p-3 border border-dashed rounded-lg space-y-2">
                   <Input
                     placeholder="项目名称"
                     value={newProjectName}
@@ -433,7 +433,7 @@ function PhaseCard({
                     placeholder="项目描述"
                     value={newProjectDesc}
                     onChange={(e) => setNewProjectDesc(e.target.value)}
-                    className="w-full h-16 p-2 border border-border rounded text-sm resize-none"
+                    className="w-full h-16 p-2 border border-border rounded-lg text-sm resize-none"
                   />
                   <div className="flex gap-2 justify-end">
                     <Button size="sm" variant="outline" onClick={() => setNewProject(false)}>
