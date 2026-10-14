@@ -265,10 +265,10 @@ export function StudentsView({
 
   // 操作按钮组件
   const ActionButtons = ({ student, stats, compact = false }: { student: Student; stats: ReturnType<typeof getStudentStats>; compact?: boolean }) => {
-    const buttonClass = compact ? "h-7 text-xs px-2 w-full" : "h-7 text-xs px-2"
+    const buttonClass = compact ? "h-7 text-xs px-2 w-full" : "h-7 text-xs px-1.5 gap-0.5"
 
     return (
-      <div className={cn(compact ? "grid grid-cols-2 gap-1" : "flex gap-1")}>
+      <div className={cn(compact ? "grid grid-cols-2 gap-1" : "flex gap-0.5")}>
         <Button
           size="sm"
           variant="outline"
@@ -359,7 +359,7 @@ export function StudentsView({
         <Card className="bg-card border-border">
           <CardContent className="p-0">
             <div className="overflow-x-auto">
-              <table className="w-full min-w-[900px]">
+              <table className="w-full min-w-[780px]">
                 <thead>
                   <tr className="border-b border-border bg-muted/30">
                     <th className="px-3 py-3 text-left text-sm font-medium text-muted-foreground">学员</th>
